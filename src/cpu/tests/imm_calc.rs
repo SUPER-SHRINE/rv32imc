@@ -157,3 +157,31 @@ fn test_xori() {
     assert_eq!(cpu.regs[3], 0x5555_5555);
     assert_eq!(cpu.pc, 8);
 }
+
+#[test]
+fn test_ori() {
+    let mut cpu = Cpu::new(0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0xAAAA_5555
+    cpu.regs[1] = 0xAAAA_5555;
+    // ORI x2, x1, 0x555 (x2 = 0xAAAA_5555 | 0x0000_0555) -> 0xAAAA_5555
+    // opcode: 0010011, funct3: 110, rd: 00010, rs1: 00001, imm: 010101010101
+    // 010101010101 00001 110 00010 0010011
+    // 0x5550e113
+    let inst = 0x5550e113;
+    bus.write_inst32(0, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 0xAAAA_5555 | 0x0000_0555);
+    assert_eq!(cpu.pc, 4);
+
+    // ORI x3, x1, -1 (x3 = 0xAAAA_5555 | 0xFFFF_FFFF) -> 0xFFFF_FFFF
+    // imm: -1 -> 0xfff (12bit)
+    // 111111111111 00001 110 00011 0010011
+    // 0xfff0e193
+    let inst = 0xfff0e193;
+    bus.write_inst32(4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0xffff_ffff);
+    assert_eq!(cpu.pc, 8);
+}

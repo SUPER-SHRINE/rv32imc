@@ -184,4 +184,11 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1] ^ imm;
         }
     }
+
+    pub(super) fn ori(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1] | imm;
+        }
+    }
 }
