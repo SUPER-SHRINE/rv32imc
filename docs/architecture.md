@@ -10,13 +10,30 @@
 2.  **Memory Bus**: CPUと外部デバイス（メモリ、VRAM、入力など）を接続する抽象化レイヤーです。
 3.  **Execution Engine**: 命令のフェッチ、デコード、および実行を行い、CPUの状態を更新します。
 
+## モジュール構成
+
+`src/cpu.rs` が肥大化したため、機能ごとにモジュールを分割しています。
+
+```text
+src/
+  ├── cpu.rs                    (Cpu構造体の定義とメインループ)
+  ├── cpu/
+  │    ├── decode.rs            (命令のデコードロジック)
+  │    ├── execute.rs           (各命令の具体的な実行処理)
+  │    ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
+  │    ├── privilege_mode.rs    (特権モードの定義)
+  │    └── tests.rs             (ユニットテスト)
+  ├── bus.rs                    (バス・トレイトの定義)
+  └── lib.rs                    (クレートのルート)
+```
+
 ---
 
 ## 主要な構造体とトレイト
 
 ### 1. CPU 構造体 (`Cpu`)
 
-CPUの内部状態を保持します。
+CPUの内部状態を保持します。(`src/cpu.rs`)
 
 ```rust
 pub struct Cpu {
@@ -50,6 +67,7 @@ pub trait Bus {
 ### 3. 命令デコードと実行
 
 現在は速度重視のため、`Instruction` 列挙型を介さず、`execute` メソッド内で直接バイナリをデコードして実行しています。
+デコードロジックは `src/cpu/decode.rs`、各命令の実装は `src/cpu/execute.rs` に集約されています。
 
 ---
 
@@ -74,7 +92,7 @@ impl Cpu {
 
 ## CSR (Control and Status Registers) 管理
 
-最小限のマシンモード用CSRを実装します。
+最小限のマシンモード用CSRを `src/cpu/csr.rs` で管理します。
 - `mstatus`, `mie`, `mtvec`, `mepc`, `mcause`, `mtval` 等。
 
 ## メモリマップの想定
@@ -92,4 +110,4 @@ impl Cpu {
 
 - **Register Dump**: `Cpu` 構造体に `dump_registers()` メソッドを実装。
 - **Instruction Tracing**: `execute` 前に逆アセンブル結果をログ出力する機能。
-- **Unit Testing**: 命令単位のテストを `src/` 内の各モジュールに配置。
+- **Unit Testing**: 命令単位のテストを `src/cpu/tests.rs` に配置。
