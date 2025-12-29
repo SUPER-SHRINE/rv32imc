@@ -95,6 +95,7 @@ impl Cpu {
                 match funct3 {
                     0b000 => self.sb(inst_bin, bus),
                     0b001 => self.sh(inst_bin, bus),
+                    0b010 => self.sw(inst_bin, bus),
                     _ => {}
                 }
                 self.pc += 4;
