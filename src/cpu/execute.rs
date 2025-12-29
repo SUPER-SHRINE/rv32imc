@@ -244,4 +244,15 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
     }
+
+    pub(super) fn slt(&mut self, inst_bin: u32) {
+        let (rd, rs1, rs2, _funct3, _funct7) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
+                1
+            } else {
+                0
+            };
+        }
+    }
 }
