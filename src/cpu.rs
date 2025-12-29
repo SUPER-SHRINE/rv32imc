@@ -38,7 +38,7 @@ impl Cpu {
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) {
         let inst_bin = self.fetch(bus);
-        self.execute(inst_bin);
+        self.execute(inst_bin, bus);
     }
 
     /// レジスタの状態をダンプ
@@ -53,7 +53,7 @@ impl Cpu {
         bus.read32(self.pc)
     }
 
-    fn execute(&mut self, inst_bin: u32) {
+    fn execute<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
         let opcode = inst_bin & 0x7f;
         match opcode {
             0b0110111 => {
@@ -77,6 +77,14 @@ impl Cpu {
                     0b111 => self.bgeu(inst_bin),
                     _ => self.pc += 4,
                 }
+            }
+            0b0000011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.lb(inst_bin, bus),
+                    _ => {}
+                }
+                self.pc += 4;
             }
             _ => {
                 self.pc += 4;
