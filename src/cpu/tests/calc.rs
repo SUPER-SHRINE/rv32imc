@@ -226,3 +226,36 @@ fn test_srl() {
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x40000000);
 }
+
+#[test]
+fn test_sra() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0x80000000, x2 = 1
+    cpu.regs[1] = 0x80000000;
+    cpu.regs[2] = 1;
+
+    // sra x3, x1, x2 (0x4020d1b3)
+    // opcode: 0110011, rd: 3, funct3: 101, rs1: 1, rs2: 2, funct7: 0100000
+    let inst = 0x4020d1b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0xc0000000);
+    assert_eq!(cpu.pc, 0x4);
+
+    // テスト2: 正の数に対する算術シフト (0x40000000 >> 1 = 0x20000000)
+    cpu.regs[1] = 0x40000000;
+    cpu.regs[2] = 1;
+    bus.write_inst32(0x4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0x20000000);
+
+    // テスト3: シフト量の下位5ビットのみが使用される
+    cpu.regs[1] = 0x80000000;
+    cpu.regs[2] = 33; // shamt = 1
+    bus.write_inst32(0x8, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0xc0000000);
+}
