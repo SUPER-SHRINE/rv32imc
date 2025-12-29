@@ -77,7 +77,14 @@ impl Cpu {
             }
             0b1101111 => self.jal(inst_bin),
             0b1100111 => self.jalr(inst_bin),
-            0b1100011 => self.beq(inst_bin),
+            0b1100011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.beq(inst_bin),
+                    0b001 => self.bne(inst_bin),
+                    _ => self.pc += 4,
+                }
+            }
             _ => {
                 self.pc += 4;
             }
@@ -173,6 +180,15 @@ impl Cpu {
     fn beq(&mut self, inst_bin: u32) {
         let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] == self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    fn bne(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] != self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
         } else {
             self.pc = self.pc.wrapping_add(4);
@@ -454,5 +470,32 @@ mod test {
 
         cpu.step(&mut bus);
         assert_eq!(cpu.pc, 0x0f00);
+    }
+
+    // bne 命令によって条件一致時にジャンプし、条件不一致時に PC + 4 進むことを確認
+    #[test]
+    fn test_bne() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        cpu.regs[1] = 10;
+        cpu.regs[2] = 20;
+        // BNE x1, x2, 0x100 (imm=0x100, rs1=1, rs2=2, funct3=1, opcode=1100011)
+        // imm[12]=0, imm[11]=0, imm[10:5]=0x08, imm[4:1]=0
+        // inst[31]=0, inst[7]=0, inst[30:25]=0x08, inst[11:8]=0
+        // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (1 << 12) | (0 << 7) | 0x63
+        //      = 0x10209063
+        let inst_bin = 0x10209063;
+        bus.write_inst32(0x1000, inst_bin);
+
+        // 条件一致 (10 != 20)
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1100);
+
+        // 条件不一致 (10 != 10)
+        cpu.pc = 0x1000;
+        cpu.regs[2] = 10;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1004);
     }
 }
