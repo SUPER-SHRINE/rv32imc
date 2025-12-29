@@ -74,3 +74,29 @@ fn test_sub_negative_result() {
     assert_eq!(cpu.regs[3], 0xffffffec); // -20
     assert_eq!(cpu.pc, 0x4);
 }
+
+#[test]
+fn test_sll() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0x00000001, x2 = 5
+    cpu.regs[1] = 0x00000001;
+    cpu.regs[2] = 5;
+
+    // sll x3, x1, x2 (0x002091b3)
+    // opcode: 0110011, rd: 3, funct3: 001, rs1: 1, rs2: 2, funct7: 0000000
+    let inst = 0x002091b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 1 << 5);
+    assert_eq!(cpu.pc, 0x4);
+
+    // テスト2: シフト量の下位5ビットのみが使用されることを確認
+    // x1 = 0x00000001, x2 = 32 (0x20) -> shamt = 0
+    cpu.regs[2] = 32;
+    bus.write_inst32(0x4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0x00000001);
+}
