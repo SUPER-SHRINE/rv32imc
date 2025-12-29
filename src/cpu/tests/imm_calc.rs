@@ -254,3 +254,33 @@ fn test_slli() {
     assert_eq!(cpu.regs[6], 0xFF00_0000);
     assert_eq!(cpu.pc, 12);
 }
+
+#[test]
+fn test_srli() {
+    let mut cpu = Cpu::new(0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0x8000_0000
+    cpu.regs[1] = 0x8000_0000;
+    // SRLI x2, x1, 1 (x2 = 0x8000_0000 >> 1) -> 0x4000_0000
+    // opcode: 0010011, funct3: 101, rd: 00010, rs1: 00001, shamt: 00001, imm[11:5]: 0000000
+    // 0000000 00001 00001 101 00010 0010011
+    // 0x0010d113
+    let inst = 0x0010d113;
+    bus.write_inst32(0, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 0x4000_0000);
+    assert_eq!(cpu.pc, 4);
+
+    // x3 = 0xFFFF_FFFF
+    cpu.regs[3] = 0xFFFF_FFFF;
+    // SRLI x4, x3, 8 (x4 = 0xFFFF_FFFF >> 8) -> 0x00FF_FFFF
+    // shamt: 8 (0b01000)
+    // 0000000 01000 00011 101 00100 0010011
+    // 0x0081d213
+    let inst = 0x0081d213;
+    bus.write_inst32(4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[4], 0x00FF_FFFF);
+    assert_eq!(cpu.pc, 8);
+}

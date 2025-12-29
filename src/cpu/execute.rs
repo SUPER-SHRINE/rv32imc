@@ -206,4 +206,12 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
     }
+
+    pub(super) fn srli(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        let shamt = imm & 0x1f;
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1] >> shamt;
+        }
+    }
 }
