@@ -130,6 +130,7 @@ impl Cpu {
                     (0b000, 0b0100000) => self.sub(inst_bin),
                     (0b001, 0b0000000) => self.sll(inst_bin),
                     (0b010, 0b0000000) => self.slt(inst_bin),
+                    (0b011, 0b0000000) => self.sltu(inst_bin),
                     _ => {}
                 }
                 self.pc += 4;
