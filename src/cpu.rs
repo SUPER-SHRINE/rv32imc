@@ -67,12 +67,28 @@ impl Cpu {
     fn execute(&mut self, inst_bin: u32) {
         let opcode = inst_bin & 0x7f;
         match opcode {
-            0b0110111 => self.lui(inst_bin),
-            0b0010111 => self.auipc(inst_bin),
+            0b0110111 => {
+                self.lui(inst_bin);
+                self.pc += 4;
+            }
+            0b0010111 => {
+                self.auipc(inst_bin);
+                self.pc += 4;
+            }
             0b1101111 => self.jal(inst_bin),
-            _ => { }
+            0b1100111 => self.jalr(inst_bin),
+            _ => {
+                self.pc += 4;
+            }
         }
-        self.pc += 4;
+    }
+
+    fn decode_i_type(&self, inst_bin: u32) -> (usize, usize, u32, u32) {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let funct3 = (inst_bin >> 12) & 0x7;
+        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+        let imm = (inst_bin as i32 >> 20) as u32; // Sign extension
+        (rd, rs1, funct3, imm)
     }
 
     fn decode_u_type(&self, inst_bin: u32) -> (usize, u32) {
@@ -120,6 +136,16 @@ impl Cpu {
             self.regs[rd] = self.pc.wrapping_add(4);
         }
         self.pc = self.pc.wrapping_add(imm);
+    }
+
+    fn jalr(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        let t = self.pc.wrapping_add(4);
+        let target = self.regs[rs1].wrapping_add(imm) & !1;
+        if rd != 0 {
+            self.regs[rd] = t;
+        }
+        self.pc = target;
     }
 }
 
@@ -305,5 +331,50 @@ mod test {
 
         assert_eq!(cpu.regs[1], 0x1004);
         assert_eq!(cpu.pc, 0x0f00);
+    }
+
+    // jalr 命令によってターゲットアドレスへジャンプし、pc + 4 がレジスタに設定されることを確認
+    #[test]
+    fn test_jalr() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        cpu.regs[2] = 0x2000;
+        // JALR x1, 0x10(x2) (imm=0x10, rs1=2, funct3=0, rd=1, opcode=1100111)
+        // inst = 0x010100e7
+        let inst_bin = 0x010100e7;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+
+        assert_eq!(cpu.regs[1], 0x1004);
+        assert_eq!(cpu.pc, 0x2010);
+    }
+
+    // jalr 命令でターゲットアドレスの最下位ビットがクリアされることを確認
+    #[test]
+    fn test_jalr_align() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        cpu.regs[2] = 0x2001;
+        // JALR x0, 0x11(x2) (imm=0x11, rs1=2, funct3=0, rd=0, opcode=1100111)
+        // 0x2001 + 0x11 = 0x2012. 0x2012 & ~1 = 0x2012
+        // inst = 0x01110067
+        let inst_bin = 0x01110067;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+
+        assert_eq!(cpu.pc, 0x2012);
+
+        // 最下位ビットがセットされるケース
+        cpu.pc = 0x1004;
+        cpu.regs[2] = 0x2000;
+        // JALR x0, 0x11(x2) -> 0x2011 & ~1 = 0x2010
+        let inst_bin = 0x01110067;
+        bus.write_inst32(0x1004, inst_bin);
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x2010);
     }
 }
