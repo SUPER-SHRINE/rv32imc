@@ -122,4 +122,13 @@ impl Cpu {
             self.regs[rd] = val;
         }
     }
+
+    pub(super) fn lhu<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        let val = bus.read16(addr) as u32;
+        if rd != 0 {
+            self.regs[rd] = val;
+        }
+    }
 }

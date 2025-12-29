@@ -85,6 +85,7 @@ impl Cpu {
                     0b001 => self.lh(inst_bin, bus),
                     0b010 => self.lw(inst_bin, bus),
                     0b100 => self.lbu(inst_bin, bus),
+                    0b101 => self.lhu(inst_bin, bus),
                     _ => {}
                 }
                 self.pc += 4;
