@@ -600,3 +600,39 @@ fn test_lw() {
     assert_eq!(cpu.regs[0], 0);
     assert_eq!(cpu.pc, 0x1004);
 }
+
+#[test]
+fn test_lbu() {
+    let mut cpu = Cpu::new(0x1000);
+    let mut bus = MockBus::new();
+
+    // LBU x1, 4(x2) (rd=1, rs1=2, funct3=4, imm=4, opcode=0000011)
+    // inst = (4 << 20) | (2 << 15) | (4 << 12) | (1 << 7) | 0x03
+    //      = 0x00414083
+    let inst_bin = 0x00414083;
+    bus.write_inst32(0x1000, inst_bin);
+
+    // 1. 正の値をロード
+    cpu.regs[2] = 0x1000;
+    bus.write8(0x1004, 0x7F);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0x7F);
+    assert_eq!(cpu.pc, 0x1004);
+
+    // 2. 負の値（のように見える値）をロード (ゼロ拡張)
+    cpu.pc = 0x1000;
+    bus.write8(0x1004, 0x80);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0x80);
+    assert_eq!(cpu.pc, 0x1004);
+
+    // 3. x0 レジスタへのロード (無視される)
+    // LBU x0, 4(x2) (rd=0, rs1=2, funct3=4, imm=4, opcode=0000011)
+    let inst_bin = 0x00414003;
+    bus.write_inst32(0x1000, inst_bin);
+    cpu.pc = 0x1000;
+    bus.write8(0x1004, 0x55);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[0], 0);
+    assert_eq!(cpu.pc, 0x1004);
+}
