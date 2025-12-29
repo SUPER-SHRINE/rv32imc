@@ -85,6 +85,7 @@ impl Cpu {
                     0b100 => self.blt(inst_bin),
                     0b101 => self.bge(inst_bin),
                     0b110 => self.bltu(inst_bin),
+                    0b111 => self.bgeu(inst_bin),
                     _ => self.pc += 4,
                 }
             }
@@ -219,6 +220,15 @@ impl Cpu {
     fn bltu(&mut self, inst_bin: u32) {
         let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] < self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    fn bgeu(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] >= self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
         } else {
             self.pc = self.pc.wrapping_add(4);
@@ -670,6 +680,55 @@ mod test {
         cpu.pc = 0x1000;
         cpu.regs[1] = -10i32 as u32;
         cpu.regs[2] = 10;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1004);
+    }
+
+    // bgeu 命令によって条件一致時にジャンプし、条件不一致時に PC + 4 進むことを確認
+    #[test]
+    fn test_bgeu() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        // 1. 条件一致: rs1 > rs2 (20 > 10) -> ジャンプ
+        cpu.regs[1] = 20;
+        cpu.regs[2] = 10;
+        // BGEU x1, x2, 0x100 (imm=0x100, rs1=1, rs2=2, funct3=7, opcode=1100011)
+        // imm[12]=0, imm[11]=0, imm[10:5]=0x08, imm[4:1]=0
+        // inst[31]=0, inst[7]=0, inst[30:25]=0x08, inst[11:8]=0
+        // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (7 << 12) | (0 << 7) | 0x63
+        //      = 0x1020f063
+        let inst_bin = 0x1020f063;
+        bus.write_inst32(0x1000, inst_bin);
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1100);
+
+        // 2. 条件一致: rs1 == rs2 (20 == 20) -> ジャンプ
+        cpu.pc = 0x1000;
+        cpu.regs[1] = 20;
+        cpu.regs[2] = 20;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1100);
+
+        // 3. 条件不一致: rs1 < rs2 (10 < 20) -> PC + 4
+        cpu.pc = 0x1000;
+        cpu.regs[1] = 10;
+        cpu.regs[2] = 20;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1004);
+
+        // 4. 符号なし比較の確認: rs1 > rs2 (-10 as u32 > 10) -> ジャンプ
+        // -10i32 as u32 は 0xfffffff6 なので、10 (0x0000000a) より大きい
+        cpu.pc = 0x1000;
+        cpu.regs[1] = -10i32 as u32;
+        cpu.regs[2] = 10;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1100);
+
+        // 5. 符号なし比較の確認: rs1 < rs2 (10 < -10 as u32) -> PC + 4
+        cpu.pc = 0x1000;
+        cpu.regs[1] = 10;
+        cpu.regs[2] = -10i32 as u32;
         cpu.step(&mut bus);
         assert_eq!(cpu.pc, 0x1004);
     }
