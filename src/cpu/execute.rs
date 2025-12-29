@@ -159,4 +159,15 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1].wrapping_add(imm);
         }
     }
+
+    pub(super) fn slti(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = if (self.regs[rs1] as i32) < (imm as i32) {
+                1
+            } else {
+                0
+            };
+        }
+    }
 }
