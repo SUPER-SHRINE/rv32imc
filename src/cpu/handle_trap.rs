@@ -1,8 +1,8 @@
-use crate::cpu::Cpu;
+use crate::cpu::{Cpu, StepResult};
 use crate::cpu::privilege_mode::PrivilegeMode;
 
 impl Cpu {
-    pub(super) fn handle_trap(&mut self, exception_code: u32) {
+    pub(super) fn handle_trap(&mut self, exception_code: u32) -> StepResult {
         // 1. mepc に現在の PC を保存
         self.csr.mepc = self.pc;
 
@@ -28,5 +28,7 @@ impl Cpu {
 
         // 5. mtvec のアドレスへジャンプ
         self.pc = self.csr.mtvec;
+
+        StepResult::Trap(exception_code)
     }
 }
