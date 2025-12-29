@@ -262,4 +262,11 @@ impl Cpu {
             self.regs[rd] = if self.regs[rs1] < self.regs[rs2] { 1 } else { 0 };
         }
     }
+
+    pub(super) fn xor(&mut self, inst_bin: u32) {
+        let (rd, rs1, rs2, _funct3, _funct7) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
+        }
+    }
 }

@@ -180,3 +180,22 @@ fn test_sltu() {
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1);
 }
+
+#[test]
+fn test_xor() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0b1010, x2 = 0b1100
+    cpu.regs[1] = 0b1010;
+    cpu.regs[2] = 0b1100;
+
+    // xor x3, x1, x2 (0x0020c1b3)
+    // opcode: 0110011, rd: 3, funct3: 100, rs1: 1, rs2: 2, funct7: 0000000
+    let inst = 0x0020c1b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0b0110);
+    assert_eq!(cpu.pc, 0x4);
+}
