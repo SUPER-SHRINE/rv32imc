@@ -8,8 +8,7 @@
 
 1.  **CPU Core**: レジスタ、PC、CSRの状態を管理し、命令の実行を制御します。
 2.  **Memory Bus**: CPUと外部デバイス（メモリ、VRAM、入力など）を接続する抽象化レイヤーです。
-3.  **Instruction Decoder**: フェッチしたバイナリを命令オブジェクトに変換します。
-4.  **Execution Engine**: 命令をデコードし、CPUの状態を更新します。
+3.  **Execution Engine**: 命令のフェッチ、デコード、および実行を行い、CPUの状態を更新します。
 
 ---
 
@@ -48,41 +47,25 @@ pub trait Bus {
 }
 ```
 
-### 3. 命令列挙型 (`Instruction`)
+### 3. 命令デコードと実行
 
-デコードされた命令を表現します。RV32I, M, C 拡張をそれぞれカバーします。
-
-```rust
-pub enum Instruction {
-    // RV32I
-    Add(Rd, Rs1, Rs2),
-    Sub(Rd, Rs1, Rs2),
-    // ...
-    // RV32M
-    Mul(Rd, Rs1, Rs2),
-    // ...
-    // RV32C (内部的には対応するRV32I命令に展開するか、独自の型として保持)
-    C_Addi(Rd, Imm),
-}
-```
+現在は速度重視のため、`Instruction` 列挙型を介さず、`execute` メソッド内で直接バイナリをデコードして実行しています。
 
 ---
 
-## 実行サイクル (Fetch-Decode-Execute)
+## 実行サイクル (Fetch-Execute)
 
 エミュレータのメインループは以下の手順を繰り返します。
 
 1.  **Fetch**: 現在の `pc` から命令を読み取ります。
     - 圧縮命令 (C拡張) の判定（下位2ビットが `11` でなければ16ビット命令）。
-2.  **Decode**: 命令バイナリを `Instruction` 列挙型に変換します。
-3.  **Execute**: 命令に応じた処理を実行し、`regs` や `pc` を更新します。
+2.  **Execute**: 命令バイナリを直接解釈し、処理を実行して `regs` や `pc` を更新します。
 
 ```rust
 impl Cpu {
     pub fn step<B: Bus>(&mut self, bus: &mut B) {
         let inst_bin = self.fetch(bus);
-        let inst = self.decode(inst_bin);
-        self.execute(inst, bus);
+        self.execute(inst_bin, bus);
     }
 }
 ```
