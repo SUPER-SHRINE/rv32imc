@@ -1,0 +1,89 @@
+use super::Cpu;
+
+impl Cpu {
+    pub(super) fn lui(&mut self, inst_bin: u32) {
+        let (rd, imm) = self.decode_u_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = imm;
+        }
+    }
+
+    pub(super) fn auipc(&mut self, inst_bin: u32) {
+        let (rd, imm) = self.decode_u_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.pc.wrapping_add(imm);
+        }
+    }
+
+    pub(super) fn jal(&mut self, inst_bin: u32) {
+        let (rd, imm) = self.decode_j_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.pc.wrapping_add(4);
+        }
+        self.pc = self.pc.wrapping_add(imm);
+    }
+
+    pub(super) fn jalr(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        let t = self.pc.wrapping_add(4);
+        let target = self.regs[rs1].wrapping_add(imm) & !1;
+        if rd != 0 {
+            self.regs[rd] = t;
+        }
+        self.pc = target;
+    }
+
+    pub(super) fn beq(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] == self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    pub(super) fn bne(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] != self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    pub(super) fn blt(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    pub(super) fn bge(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if (self.regs[rs1] as i32) >= (self.regs[rs2] as i32) {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    pub(super) fn bltu(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] < self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+
+    pub(super) fn bgeu(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] >= self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
+    }
+}
