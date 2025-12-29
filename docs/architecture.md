@@ -22,7 +22,11 @@ src/
   │    ├── execute.rs           (各命令の具体的な実行処理)
   │    ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
   │    ├── privilege_mode.rs    (特権モードの定義)
-  │    └── tests.rs             (ユニットテスト)
+  │    ├── tests.rs             (テスト用ヘルパーとモジュール定義)
+  │    └── tests/               (命令カテゴリごとのユニットテスト)
+  │         ├── lui.rs
+  │         ├── auipc.rs
+  │         └── ...
   ├── bus.rs                    (バス・トレイトの定義)
   └── lib.rs                    (クレートのルート)
 ```
@@ -110,4 +114,4 @@ impl Cpu {
 
 - **Register Dump**: `Cpu` 構造体に `dump_registers()` メソッドを実装。
 - **Instruction Tracing**: `execute` 前に逆アセンブル結果をログ出力する機能。
-- **Unit Testing**: 命令単位のテストを `src/cpu/tests.rs` に配置。
+- **Unit Testing**: 命令単位のテストを `src/cpu/tests/` 配下にカテゴリ別に分割して配置。共有のテスト用モック（`MockBus` 等）は `src/cpu/tests.rs` で定義。
