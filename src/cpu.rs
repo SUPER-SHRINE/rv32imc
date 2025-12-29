@@ -94,6 +94,7 @@ impl Cpu {
                 let funct3 = (inst_bin >> 12) & 0x7;
                 match funct3 {
                     0b000 => self.sb(inst_bin, bus),
+                    0b001 => self.sh(inst_bin, bus),
                     _ => {}
                 }
                 self.pc += 4;

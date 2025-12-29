@@ -138,4 +138,11 @@ impl Cpu {
         let val = (self.regs[rs2] & 0xff) as u8;
         bus.write8(addr, val);
     }
+
+    pub(super) fn sh<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
+        let (rs1, rs2, _funct3, imm) = self.decode_s_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        let val = (self.regs[rs2] & 0xffff) as u16;
+        bus.write16(addr, val);
+    }
 }
