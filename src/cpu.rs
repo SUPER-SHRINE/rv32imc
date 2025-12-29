@@ -122,6 +122,15 @@ impl Cpu {
                 }
                 self.pc += 4;
             }
+            0b0110011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                let funct7 = (inst_bin >> 25) & 0x7f;
+                match (funct3, funct7) {
+                    (0b000, 0b0000000) => self.add(inst_bin),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
             _ => {
                 self.pc += 4;
             }
