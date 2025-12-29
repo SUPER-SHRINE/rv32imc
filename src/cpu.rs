@@ -74,7 +74,14 @@ impl Cpu {
                     0b010 => self.slti(inst_bin),
                     0b011 => self.sltiu(inst_bin),
                     0b100 => self.xori(inst_bin),
-                    0b101 => self.srli(inst_bin),
+                    0b101 => {
+                        let imm11_5 = (inst_bin >> 25) & 0x7f;
+                        match imm11_5 {
+                            0b0000000 => self.srli(inst_bin),
+                            0b0100000 => self.srai(inst_bin),
+                            _ => {}
+                        }
+                    }
                     0b110 => self.ori(inst_bin),
                     0b111 => self.andi(inst_bin),
                     _ => {}

@@ -284,3 +284,44 @@ fn test_srli() {
     assert_eq!(cpu.regs[4], 0x00FF_FFFF);
     assert_eq!(cpu.pc, 8);
 }
+
+#[test]
+fn test_srai() {
+    let mut cpu = Cpu::new(0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0x8000_0000
+    cpu.regs[1] = 0x8000_0000;
+    // SRAI x2, x1, 1 (x2 = 0x8000_0000 >> 1 arithmetic) -> 0xC000_0000
+    // opcode: 0010011, funct3: 101, rd: 00010, rs1: 00001, shamt: 00001, imm[11:5]: 0100000
+    // 0100000 00001 00001 101 00010 0010011
+    // 0x4010d113
+    let inst = 0x4010d113;
+    bus.write_inst32(0, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 0xC000_0000);
+    assert_eq!(cpu.pc, 4);
+
+    // x3 = 0x0000_0001
+    cpu.regs[3] = 0x0000_0001;
+    // SRAI x4, x3, 1 (x4 = 0x0000_0001 >> 1 arithmetic) -> 0x0000_0000
+    // 0100000 00001 00011 101 00100 0010011
+    // 0x4011d213
+    let inst = 0x4011d213;
+    bus.write_inst32(4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[4], 0x0000_0000);
+    assert_eq!(cpu.pc, 8);
+
+    // x5 = 0xFFFF_FFFF (-1)
+    cpu.regs[5] = 0xFFFF_FFFF;
+    // SRAI x6, x5, 8 (x6 = 0xFFFF_FFFF >> 8 arithmetic) -> 0xFFFF_FFFF
+    // shamt: 8 (0b01000)
+    // 0100000 01000 00101 101 00110 0010011
+    // 0x4082d313
+    let inst = 0x4082d313;
+    bus.write_inst32(8, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[6], 0xFFFF_FFFF);
+    assert_eq!(cpu.pc, 12);
+}
