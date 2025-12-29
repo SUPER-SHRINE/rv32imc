@@ -217,6 +217,99 @@ impl Cpu {
                         // MRET
                         self.mret();
                     }
+                    (0b001, _) => {
+                        // CSRRW
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        let new_val = self.regs[rs1 as usize];
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        self.csr.write(csr_addr, new_val);
+                        self.pc += 4;
+                    }
+                    (0b010, _) => {
+                        // CSRRS
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        let set_mask = self.regs[rs1 as usize];
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if rs1 != 0 {
+                            self.csr.write(csr_addr, old_val | set_mask);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b011, _) => {
+                        // CSRRC
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        let clear_mask = self.regs[rs1 as usize];
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if rs1 != 0 {
+                            self.csr.write(csr_addr, old_val & !clear_mask);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b101, _) => {
+                        // CSRRWI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        self.csr.write(csr_addr, uimm);
+                        self.pc += 4;
+                    }
+                    (0b110, _) => {
+                        // CSRRSI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if uimm != 0 {
+                            self.csr.write(csr_addr, old_val | uimm);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b111, _) => {
+                        // CSRRCI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if uimm != 0 {
+                            self.csr.write(csr_addr, old_val & !uimm);
+                        }
+                        self.pc += 4;
+                    }
                     _ => {
                         // CSR instructions etc (not implemented yet)
                         self.pc += 4;

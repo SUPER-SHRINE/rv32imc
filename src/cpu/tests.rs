@@ -1,6 +1,7 @@
 mod auipc;
 mod branch;
 mod calc;
+mod csr;
 mod exception;
 mod fence;
 mod imm_calc;
