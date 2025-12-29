@@ -7,6 +7,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = imm;
         }
+        self.pc += 4;
     }
 
     pub(super) fn auipc(&mut self, inst_bin: u32) {
@@ -14,6 +15,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.pc.wrapping_add(imm);
         }
+        self.pc += 4;
     }
 
     pub(super) fn jal(&mut self, inst_bin: u32) {
@@ -95,6 +97,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
+        self.pc += 4;
     }
 
     pub(super) fn lh<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -104,6 +107,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
+        self.pc += 4;
     }
 
     pub(super) fn lw<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -113,6 +117,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
+        self.pc += 4;
     }
 
     pub(super) fn lbu<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -122,6 +127,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
+        self.pc += 4;
     }
 
     pub(super) fn lhu<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -131,6 +137,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
+        self.pc += 4;
     }
 
     pub(super) fn sb<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -138,6 +145,7 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xff) as u8;
         bus.write8(addr, val);
+        self.pc += 4;
     }
 
     pub(super) fn sh<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -145,6 +153,7 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xffff) as u16;
         bus.write16(addr, val);
+        self.pc += 4;
     }
 
     pub(super) fn sw<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
@@ -152,6 +161,7 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = self.regs[rs2];
         bus.write32(addr, val);
+        self.pc += 4;
     }
 
     pub(super) fn addi(&mut self, inst_bin: u32) {
@@ -159,6 +169,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_add(imm);
         }
+        self.pc += 4;
     }
 
     pub(super) fn slti(&mut self, inst_bin: u32) {
@@ -170,6 +181,7 @@ impl Cpu {
                 0
             };
         }
+        self.pc += 4;
     }
 
     pub(super) fn sltiu(&mut self, inst_bin: u32) {
@@ -177,6 +189,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = if self.regs[rs1] < imm { 1 } else { 0 };
         }
+        self.pc += 4;
     }
 
     pub(super) fn xori(&mut self, inst_bin: u32) {
@@ -184,6 +197,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] ^ imm;
         }
+        self.pc += 4;
     }
 
     pub(super) fn ori(&mut self, inst_bin: u32) {
@@ -191,6 +205,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] | imm;
         }
+        self.pc += 4;
     }
 
     pub(super) fn andi(&mut self, inst_bin: u32) {
@@ -198,6 +213,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] & imm;
         }
+        self.pc += 4;
     }
 
     pub(super) fn slli(&mut self, inst_bin: u32) {
@@ -206,6 +222,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
+        self.pc += 4;
     }
 
     pub(super) fn srli(&mut self, inst_bin: u32) {
@@ -214,6 +231,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] >> shamt;
         }
+        self.pc += 4;
     }
 
     pub(super) fn srai(&mut self, inst_bin: u32) {
@@ -222,6 +240,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
         }
+        self.pc += 4;
     }
 
     pub(super) fn add(&mut self, inst_bin: u32) {
@@ -229,6 +248,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]);
         }
+        self.pc += 4;
     }
 
     pub(super) fn sub(&mut self, inst_bin: u32) {
@@ -236,6 +256,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]);
         }
+        self.pc += 4;
     }
 
     pub(super) fn sll(&mut self, inst_bin: u32) {
@@ -244,6 +265,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
+        self.pc += 4;
     }
 
     pub(super) fn slt(&mut self, inst_bin: u32) {
@@ -255,6 +277,7 @@ impl Cpu {
                 0
             };
         }
+        self.pc += 4;
     }
 
     pub(super) fn sltu(&mut self, inst_bin: u32) {
@@ -262,6 +285,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = if self.regs[rs1] < self.regs[rs2] { 1 } else { 0 };
         }
+        self.pc += 4;
     }
 
     pub(super) fn xor(&mut self, inst_bin: u32) {
@@ -269,6 +293,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
         }
+        self.pc += 4;
     }
 
     pub(super) fn srl(&mut self, inst_bin: u32) {
@@ -277,6 +302,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] >> shamt;
         }
+        self.pc += 4;
     }
 
     pub(super) fn sra(&mut self, inst_bin: u32) {
@@ -285,6 +311,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
         }
+        self.pc += 4;
     }
 
     pub(super) fn or(&mut self, inst_bin: u32) {
@@ -292,6 +319,7 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] | self.regs[rs2];
         }
+        self.pc += 4;
     }
 
     pub(super) fn and(&mut self, inst_bin: u32) {
@@ -299,8 +327,17 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] & self.regs[rs2];
         }
+        self.pc += 4;
     }
-    
+
+    pub(super) fn fence(&mut self) {
+        self.pc += 4;
+    }
+
+    pub(super) fn fence_i(&mut self) {
+        self.pc += 4;
+    }
+
     pub(super) fn ecall(&mut self) {
         let code = match self.mode {
             PrivilegeMode::User => 8,
@@ -309,7 +346,7 @@ impl Cpu {
         };
         self.handle_trap(code);
     }
-    
+
     pub(super) fn ebreak(&mut self) {
         self.handle_trap(3); // Breakpoint exception code is 3
     }
@@ -334,7 +371,7 @@ impl Cpu {
         // MPP is set to the least-privileged mode supported (User=0)
         self.csr.mstatus &= !(0b11 << 11);
     }
-    
+
     pub(super) fn csrrw(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let rs1 = (inst_bin >> 15) & 0x1f;
@@ -347,8 +384,9 @@ impl Cpu {
             self.regs[rd as usize] = old_val;
         }
         self.csr.write(csr_addr, new_val);
+        self.pc += 4;
     }
-    
+
     pub(super) fn csrrs(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let rs1 = (inst_bin >> 15) & 0x1f;
@@ -363,8 +401,9 @@ impl Cpu {
         if rs1 != 0 {
             self.csr.write(csr_addr, old_val | set_mask);
         }
+        self.pc += 4;
     }
-    
+
     pub(super) fn csrrc(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let rs1 = (inst_bin >> 15) & 0x1f;
@@ -379,8 +418,9 @@ impl Cpu {
         if rs1 != 0 {
             self.csr.write(csr_addr, old_val & !clear_mask);
         }
+        self.pc += 4;
     }
-    
+
     pub(super) fn csrrwi(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let uimm = (inst_bin >> 15) & 0x1f;
@@ -392,8 +432,9 @@ impl Cpu {
             self.regs[rd as usize] = old_val;
         }
         self.csr.write(csr_addr, uimm);
+        self.pc += 4;
     }
-    
+
     pub(super) fn csrrsi(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let uimm = (inst_bin >> 15) & 0x1f;
@@ -406,8 +447,9 @@ impl Cpu {
         if uimm != 0 {
             self.csr.write(csr_addr, old_val | uimm);
         }
+        self.pc += 4;
     }
-    
+
     pub(super) fn csrrci(&mut self, inst_bin: u32) {
         let csr_addr = (inst_bin >> 20) & 0xfff;
         let uimm = (inst_bin >> 15) & 0x1f;
@@ -420,5 +462,6 @@ impl Cpu {
         if uimm != 0 {
             self.csr.write(csr_addr, old_val & !uimm);
         }
+        self.pc += 4;
     }
-} 
+}

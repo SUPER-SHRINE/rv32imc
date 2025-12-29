@@ -73,4 +73,12 @@ impl Cpu {
         let rd = ((inst_bin >> 7) & 0x1f) as usize;
         (rd, rs1, rs2)
     }
+    
+    pub(super) fn decode_funct3(&self, inst_bin: u32) -> u32 {
+        (inst_bin >> 12) & 0x7
+    }
+    
+    pub(super) fn decode_funct7(&self, inst_bin: u32) -> u32 {
+        (inst_bin >> 25) & 0x7f
+    }
 }

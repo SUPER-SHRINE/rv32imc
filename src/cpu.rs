@@ -57,139 +57,87 @@ impl Cpu {
     fn execute<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
         let opcode = inst_bin & 0x7f;
         match opcode {
-            0b0110111 => {
-                self.lui(inst_bin);
-                self.pc += 4;
-            }
-            0b0010111 => {
-                self.auipc(inst_bin);
-                self.pc += 4;
-            }
+            0b0110111 => self.lui(inst_bin),
+            0b0010111 => self.auipc(inst_bin),
             0b1101111 => self.jal(inst_bin),
             0b1100111 => self.jalr(inst_bin),
-            0b0010011 => {
-                let funct3 = (inst_bin >> 12) & 0x7;
-                match funct3 {
-                    0b000 => self.addi(inst_bin),
-                    0b001 => self.slli(inst_bin),
-                    0b010 => self.slti(inst_bin),
-                    0b011 => self.sltiu(inst_bin),
-                    0b100 => self.xori(inst_bin),
-                    0b101 => {
-                        let imm11_5 = (inst_bin >> 25) & 0x7f;
-                        match imm11_5 {
-                            0b0000000 => self.srli(inst_bin),
-                            0b0100000 => self.srai(inst_bin),
-                            _ => {}
-                        }
-                    }
-                    0b110 => self.ori(inst_bin),
-                    0b111 => self.andi(inst_bin),
-                    _ => {}
-                }
-                self.pc += 4;
-            }
-            0b1100011 => {
-                let funct3 = (inst_bin >> 12) & 0x7;
-                match funct3 {
-                    0b000 => self.beq(inst_bin),
-                    0b001 => self.bne(inst_bin),
-                    0b100 => self.blt(inst_bin),
-                    0b101 => self.bge(inst_bin),
-                    0b110 => self.bltu(inst_bin),
-                    0b111 => self.bgeu(inst_bin),
-                    _ => self.pc += 4,
-                }
-            }
-            0b0000011 => {
-                let funct3 = (inst_bin >> 12) & 0x7;
-                match funct3 {
-                    0b000 => self.lb(inst_bin, bus),
-                    0b001 => self.lh(inst_bin, bus),
-                    0b010 => self.lw(inst_bin, bus),
-                    0b100 => self.lbu(inst_bin, bus),
-                    0b101 => self.lhu(inst_bin, bus),
-                    _ => {}
-                }
-                self.pc += 4;
-            }
-            0b0100011 => {
-                let funct3 = (inst_bin >> 12) & 0x7;
-                match funct3 {
+            0b0010011 => match self.decode_funct3(inst_bin) {
+                0b000 => self.addi(inst_bin),
+                0b001 => self.slli(inst_bin),
+                0b010 => self.slti(inst_bin),
+                0b011 => self.sltiu(inst_bin),
+                0b100 => self.xori(inst_bin),
+                0b101 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.srli(inst_bin),
+                    0b0100000 => self.srai(inst_bin),
+                    _ => (),
+                },
+                0b110 => self.ori(inst_bin),
+                0b111 => self.andi(inst_bin),
+                _ => (),
+            },
+            0b1100011 => match self.decode_funct3(inst_bin) {
+                0b000 => self.beq(inst_bin),
+                0b001 => self.bne(inst_bin),
+                0b100 => self.blt(inst_bin),
+                0b101 => self.bge(inst_bin),
+                0b110 => self.bltu(inst_bin),
+                0b111 => self.bgeu(inst_bin),
+                _ => (),
+            },
+            0b0000011 => match self.decode_funct3(inst_bin) {
+                0b000 => self.lb(inst_bin, bus),
+                0b001 => self.lh(inst_bin, bus),
+                0b010 => self.lw(inst_bin, bus),
+                0b100 => self.lbu(inst_bin, bus),
+                0b101 => self.lhu(inst_bin, bus),
+                _ => (),
+            },
+            0b0100011 => match self.decode_funct3(inst_bin) {
                     0b000 => self.sb(inst_bin, bus),
                     0b001 => self.sh(inst_bin, bus),
                     0b010 => self.sw(inst_bin, bus),
-                    _ => {}
-                }
-                self.pc += 4;
+                    _ => (),
+            },
+            0b0110011 => match self.decode_funct3(inst_bin) {
+                0b000 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.add(inst_bin),
+                    0b0100000 => self.sub(inst_bin),
+                    _ => (),
+                },
+                0b001 => self.sll(inst_bin),
+                0b010 => self.slt(inst_bin),
+                0b011 => self.sltu(inst_bin),
+                0b100 => self.xor(inst_bin),
+                0b101 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.srl(inst_bin),
+                    0b0100000 => self.sra(inst_bin),
+                    _ => (),
+                },
+                0b110 => self.or(inst_bin),
+                0b111 => self.and(inst_bin),
+                _ => (),
             }
-            0b0110011 => {
-                let funct3 = (inst_bin >> 12) & 0x7;
-                let funct7 = (inst_bin >> 25) & 0x7f;
-                match (funct3, funct7) {
-                    (0b000, 0b0000000) => self.add(inst_bin),
-                    (0b000, 0b0100000) => self.sub(inst_bin),
-                    (0b001, 0b0000000) => self.sll(inst_bin),
-                    (0b010, 0b0000000) => self.slt(inst_bin),
-                    (0b011, 0b0000000) => self.sltu(inst_bin),
-                    (0b100, 0b0000000) => self.xor(inst_bin),
-                    (0b101, 0b0000000) => self.srl(inst_bin),
-                    (0b101, 0b0100000) => self.sra(inst_bin),
-                    (0b110, 0b0000000) => self.or(inst_bin),
-                    (0b111, 0b0000000) => self.and(inst_bin),
-                    _ => {}
-                }
-                self.pc += 4;
-            }
-            0b0001111 => {
-                // FENCE, FENCE.I
-                // 現在の実装では NOP 扱い
-                self.pc += 4;
-            }
-            0b1110011 => {
-                // SYSTEM (ECALL, EBREAK, CSR instructions)
-                let funct3 = (inst_bin >> 12) & 0x7;
-                let imm11_0 = (inst_bin >> 20) & 0xfff;
-
-                match funct3 {
-                    0b000 => {
-                        match imm11_0 {
-                            0b000000000000 => self.ecall(),
-                            0b000000000001 => self.ebreak(),
-                            0b001100000010 => self.mret(),
-                            _ => (),
-                        }
-                    },
-                    0b001 => {
-                        self.csrrw(inst_bin);
-                        self.pc += 4;
-                    },
-                    0b010 => {
-                        self.csrrs(inst_bin);
-                        self.pc += 4;
-                    }
-                    0b011 => {
-                        self.csrrc(inst_bin);
-                        self.pc += 4;
-                    }
-                    0b101 => {
-                        self.csrrwi(inst_bin);
-                        self.pc += 4;
-                    }
-                    0b110 => {
-                        self.csrrsi(inst_bin);
-                        self.pc += 4;
-                    }
-                    0b111 => {
-                        self.csrrci(inst_bin);
-                        self.pc += 4;
-                    }
-                    _ => {
-                        // CSR instructions etc (not implemented yet)
-                        self.pc += 4;
-                    }
-                }
-            }
+            0b0001111 => match self.decode_funct3(inst_bin) {
+                0b000 => self.fence(),
+                0b001 => self.fence_i(),
+                _ => (),
+            },
+            0b1110011 => match self.decode_funct3(inst_bin) {
+                0b000 => match (inst_bin >> 20) & 0xfff {
+                    0b000000000000 => self.ecall(),
+                    0b000000000001 => self.ebreak(),
+                    0b001100000010 => self.mret(),
+                    _ => (),
+                },
+                0b001 => self.csrrw(inst_bin),
+                0b010 => self.csrrs(inst_bin),
+                0b011 => self.csrrc(inst_bin),
+                0b101 => self.csrrwi(inst_bin),
+                0b110 => self.csrrsi(inst_bin),
+                0b111 => self.csrrci(inst_bin),
+                _ => (),
+            },
             _ => {
                 self.pc += 4;
             }
