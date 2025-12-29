@@ -134,6 +134,7 @@ impl Cpu {
                     (0b100, 0b0000000) => self.xor(inst_bin),
                     (0b101, 0b0000000) => self.srl(inst_bin),
                     (0b101, 0b0100000) => self.sra(inst_bin),
+                    (0b110, 0b0000000) => self.or(inst_bin),
                     _ => {}
                 }
                 self.pc += 4;
