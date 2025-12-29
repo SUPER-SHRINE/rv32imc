@@ -39,27 +39,36 @@
     - 特権モードを `MPP` に保存されていた値に戻します。
 *   **注意点**: `ECALL` から復帰する場合、そのまま戻ると再び `ECALL` が実行されるため、通常はトラップハンドラ内で `mepc` を +4 しておく必要があります。
 
-## 4. 実装方針案
+## 4. 実装状況
 
-`Cpu` 構造体にトラップ処理を一括して行う `handle_trap` メソッドを実装します。
+`Cpu` 構造体にトラップ処理を一括して行う `handle_trap` メソッドが実装されています。
 
 ```rust
 impl Cpu {
-    fn handle_trap(&mut self, exception_code: u32) {
-        // 1. mepc に現在の PC を保存
-        self.csr.mepc = self.pc;
+    pub(super) fn handle_trap(&mut self, exception_code: u32) -> StepResult {
+        // 1. mepc に現在の PC を保存(復帰時に再度 ECALL が呼ばれないように PC に +4 しておく)
+        self.csr.mepc = self.pc + 4;
 
         // 2. mcause に例外コードを設定
         self.csr.mcause = exception_code;
 
         // 3. mstatus の更新 (MPP, MPIE, MIE)
-        // (ビット操作の実装が必要)
+        let mie = (self.csr.mstatus >> 3) & 1;
+        self.csr.mstatus &= !(1 << 7); // MPIE = 0
+        self.csr.mstatus |= mie << 7;  // MPIE = MIE
+        self.csr.mstatus &= !(1 << 3); // MIE = 0
+
+        let mpp = self.mode as u32;
+        self.csr.mstatus &= !(0b11 << 11); // MPP = 0
+        self.csr.mstatus |= mpp << 11;     // MPP = mode
 
         // 4. 特権モードを Machine に遷移
         self.mode = PrivilegeMode::Machine;
 
         // 5. mtvec のアドレスへジャンプ
         self.pc = self.csr.mtvec;
+
+        StepResult::Trap(exception_code)
     }
 }
 ```
