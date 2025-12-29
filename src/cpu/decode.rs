@@ -54,4 +54,19 @@ impl Cpu {
 
         (rs1, rs2, funct3, imm)
     }
+
+    pub(super) fn decode_s_type(&self, inst_bin: u32) -> (usize, usize, u32, u32) {
+        let imm11_5 = (inst_bin >> 25) & 0x7f;
+        let rs2 = ((inst_bin >> 20) & 0x1f) as usize;
+        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+        let funct3 = (inst_bin >> 12) & 0x7;
+        let imm4_0 = (inst_bin >> 7) & 0x1f;
+
+        let imm = (imm11_5 << 5) | imm4_0;
+
+        // Sign extension from 12th bit
+        let imm = ((imm as i32) << 20 >> 20) as u32;
+
+        (rs1, rs2, funct3, imm)
+    }
 }

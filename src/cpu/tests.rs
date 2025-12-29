@@ -3,6 +3,7 @@ mod branch;
 mod jump;
 mod load;
 mod lui;
+mod store;
 
 pub(super) use crate::bus::Bus;
 
