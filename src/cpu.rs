@@ -1,25 +1,14 @@
+mod csr;
+mod execute;
+mod decode;
+mod privilege_mode;
+
+#[cfg(test)]
+mod tests;
+
 use super::bus;
-
-/// RISC-V の特権モード
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrivilegeMode {
-    User       = 0,
-    Supervisor = 1,
-    Machine    = 3,
-}
-
-/// 制御ステータスレジスタ (CSR)
-#[derive(Default)]
-pub struct Csr {
-    // 主要なマシンモードCSR
-    pub mstatus: u32,
-    pub mtvec:   u32,
-    pub mie:     u32,
-    pub mepc:    u32,
-    pub mcause:  u32,
-    pub mtval:   u32,
-    pub mip:     u32,
-}
+use csr::Csr;
+use privilege_mode::PrivilegeMode;
 
 /// CPU の内部状態
 pub struct Cpu {
@@ -49,8 +38,7 @@ impl Cpu {
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) {
         let inst_bin = self.fetch(bus);
-        let inst = self.decode(inst_bin);
-        self.execute(inst, bus);
+        self.execute(inst_bin, bus);
     }
 
     /// レジスタの状態をダンプ
@@ -61,36 +49,276 @@ impl Cpu {
         println!("pc : 0x{:08x}", self.pc);
     }
 
-    fn fetch<B: bus::Bus>(&mut self, _bus: &mut B) -> u32 {
-        // TODO: 命令フェッチの実装
-        0
+    fn handle_trap(&mut self, exception_code: u32) {
+        // 1. mepc に現在の PC を保存
+        self.csr.mepc = self.pc;
+
+        // 2. mcause に例外コードを設定
+        self.csr.mcause = exception_code;
+
+        // 3. mstatus の更新 (MPP, MPIE, MIE)
+        // mstatus bit fields:
+        // MIE:  bit 3
+        // MPIE: bit 7
+        // MPP:  bits 11-12
+        let mie = (self.csr.mstatus >> 3) & 1;
+        self.csr.mstatus &= !(1 << 7); // MPIE = 0
+        self.csr.mstatus |= mie << 7;  // MPIE = MIE
+        self.csr.mstatus &= !(1 << 3); // MIE = 0
+
+        let mpp = self.mode as u32;
+        self.csr.mstatus &= !(0b11 << 11); // MPP = 0
+        self.csr.mstatus |= mpp << 11;     // MPP = mode
+
+        // 4. 特権モードを Machine に遷移
+        self.mode = PrivilegeMode::Machine;
+
+        // 5. mtvec のアドレスへジャンプ
+        self.pc = self.csr.mtvec;
     }
 
-    fn decode(&self, _inst_bin: u32) -> Instruction {
-        // TODO: デコードの実装
-        Instruction::Nop
+    fn mret(&mut self) {
+        // PC を mepc に復帰
+        self.pc = self.csr.mepc;
+
+        // mstatus の復帰
+        let mpie = (self.csr.mstatus >> 7) & 1;
+        self.csr.mstatus &= !(1 << 3);  // MIE = 0
+        self.csr.mstatus |= mpie << 3;  // MIE = MPIE
+        self.csr.mstatus |= 1 << 7;     // MPIE = 1 (spec says MPIE is set to 1)
+
+        let mpp = (self.csr.mstatus >> 11) & 0b11;
+        self.mode = match mpp {
+            0 => PrivilegeMode::User,
+            1 => PrivilegeMode::Supervisor,
+            3 => PrivilegeMode::Machine,
+            _ => PrivilegeMode::Machine, // Should not happen
+        };
+        // MPP is set to the least-privileged mode supported (User=0)
+        self.csr.mstatus &= !(0b11 << 11);
     }
 
-    fn execute<B: bus::Bus>(&mut self, _inst: Instruction, _bus: &mut B) {
-        // TODO: 命令実行の実装
+    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> u32 {
+        bus.read32(self.pc)
     }
-}
 
-/// デコードされた命令
-enum Instruction {
-    Nop,
+    fn execute<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) {
+        let opcode = inst_bin & 0x7f;
+        match opcode {
+            0b0110111 => {
+                self.lui(inst_bin);
+                self.pc += 4;
+            }
+            0b0010111 => {
+                self.auipc(inst_bin);
+                self.pc += 4;
+            }
+            0b1101111 => self.jal(inst_bin),
+            0b1100111 => self.jalr(inst_bin),
+            0b0010011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.addi(inst_bin),
+                    0b001 => self.slli(inst_bin),
+                    0b010 => self.slti(inst_bin),
+                    0b011 => self.sltiu(inst_bin),
+                    0b100 => self.xori(inst_bin),
+                    0b101 => {
+                        let imm11_5 = (inst_bin >> 25) & 0x7f;
+                        match imm11_5 {
+                            0b0000000 => self.srli(inst_bin),
+                            0b0100000 => self.srai(inst_bin),
+                            _ => {}
+                        }
+                    }
+                    0b110 => self.ori(inst_bin),
+                    0b111 => self.andi(inst_bin),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
+            0b1100011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.beq(inst_bin),
+                    0b001 => self.bne(inst_bin),
+                    0b100 => self.blt(inst_bin),
+                    0b101 => self.bge(inst_bin),
+                    0b110 => self.bltu(inst_bin),
+                    0b111 => self.bgeu(inst_bin),
+                    _ => self.pc += 4,
+                }
+            }
+            0b0000011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.lb(inst_bin, bus),
+                    0b001 => self.lh(inst_bin, bus),
+                    0b010 => self.lw(inst_bin, bus),
+                    0b100 => self.lbu(inst_bin, bus),
+                    0b101 => self.lhu(inst_bin, bus),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
+            0b0100011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.sb(inst_bin, bus),
+                    0b001 => self.sh(inst_bin, bus),
+                    0b010 => self.sw(inst_bin, bus),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
+            0b0110011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                let funct7 = (inst_bin >> 25) & 0x7f;
+                match (funct3, funct7) {
+                    (0b000, 0b0000000) => self.add(inst_bin),
+                    (0b000, 0b0100000) => self.sub(inst_bin),
+                    (0b001, 0b0000000) => self.sll(inst_bin),
+                    (0b010, 0b0000000) => self.slt(inst_bin),
+                    (0b011, 0b0000000) => self.sltu(inst_bin),
+                    (0b100, 0b0000000) => self.xor(inst_bin),
+                    (0b101, 0b0000000) => self.srl(inst_bin),
+                    (0b101, 0b0100000) => self.sra(inst_bin),
+                    (0b110, 0b0000000) => self.or(inst_bin),
+                    (0b111, 0b0000000) => self.and(inst_bin),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
+            0b0001111 => {
+                // FENCE, FENCE.I
+                // 現在の実装では NOP 扱い
+                self.pc += 4;
+            }
+            0b1110011 => {
+                // SYSTEM (ECALL, EBREAK, CSR instructions)
+                let funct3 = (inst_bin >> 12) & 0x7;
+                let imm11_0 = (inst_bin >> 20) & 0xfff;
 
-    // RV32I
-    // TODO: RV32I の命令を定義する
+                match (funct3, imm11_0) {
+                    (0b000, 0b000000000000) => {
+                        // ECALL
+                        let code = match self.mode {
+                            PrivilegeMode::User => 8,
+                            PrivilegeMode::Supervisor => 9,
+                            PrivilegeMode::Machine => 11,
+                        };
+                        self.handle_trap(code);
+                    }
+                    (0b000, 0b000000000001) => {
+                        // EBREAK
+                        self.handle_trap(3); // Breakpoint exception code is 3
+                    }
+                    (0b000, 0b001100000010) => {
+                        // MRET
+                        self.mret();
+                    }
+                    (0b001, _) => {
+                        // CSRRW
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
 
-    // RV32M
-    // TODO: M拡張の命令を定義する
+                        let old_val = self.csr.read(csr_addr);
+                        let new_val = self.regs[rs1 as usize];
 
-    // RV32C
-    // TODO: C拡張の命令を定義する
-}
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        self.csr.write(csr_addr, new_val);
+                        self.pc += 4;
+                    }
+                    (0b010, _) => {
+                        // CSRRS
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
 
-#[cfg(test)]
-mod test {
-    // TODO: テストはここに書いていく
+                        let old_val = self.csr.read(csr_addr);
+                        let set_mask = self.regs[rs1 as usize];
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if rs1 != 0 {
+                            self.csr.write(csr_addr, old_val | set_mask);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b011, _) => {
+                        // CSRRC
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let rs1 = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        let clear_mask = self.regs[rs1 as usize];
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if rs1 != 0 {
+                            self.csr.write(csr_addr, old_val & !clear_mask);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b101, _) => {
+                        // CSRRWI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        self.csr.write(csr_addr, uimm);
+                        self.pc += 4;
+                    }
+                    (0b110, _) => {
+                        // CSRRSI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if uimm != 0 {
+                            self.csr.write(csr_addr, old_val | uimm);
+                        }
+                        self.pc += 4;
+                    }
+                    (0b111, _) => {
+                        // CSRRCI
+                        let csr_addr = (inst_bin >> 20) & 0xfff;
+                        let uimm = (inst_bin >> 15) & 0x1f;
+                        let rd = (inst_bin >> 7) & 0x1f;
+
+                        let old_val = self.csr.read(csr_addr);
+                        if rd != 0 {
+                            self.regs[rd as usize] = old_val;
+                        }
+                        if uimm != 0 {
+                            self.csr.write(csr_addr, old_val & !uimm);
+                        }
+                        self.pc += 4;
+                    }
+                    _ => {
+                        // CSR instructions etc (not implemented yet)
+                        self.pc += 4;
+                    }
+                }
+            }
+            _ => {
+                self.pc += 4;
+            }
+        }
+    }
 }

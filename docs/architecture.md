@@ -8,8 +8,28 @@
 
 1.  **CPU Core**: レジスタ、PC、CSRの状態を管理し、命令の実行を制御します。
 2.  **Memory Bus**: CPUと外部デバイス（メモリ、VRAM、入力など）を接続する抽象化レイヤーです。
-3.  **Instruction Decoder**: フェッチしたバイナリを命令オブジェクトに変換します。
-4.  **Execution Engine**: 命令をデコードし、CPUの状態を更新します。
+3.  **Execution Engine**: 命令のフェッチ、デコード、および実行を行い、CPUの状態を更新します。
+
+## モジュール構成
+
+`src/cpu.rs` が肥大化したため、機能ごとにモジュールを分割しています。
+
+```text
+src/
+  ├── cpu.rs                    (Cpu構造体の定義とメインループ)
+  ├── cpu/
+  │    ├── decode.rs            (命令のデコードロジック)
+  │    ├── execute.rs           (各命令の具体的な実行処理)
+  │    ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
+  │    ├── privilege_mode.rs    (特権モードの定義)
+  │    ├── tests.rs             (テスト用ヘルパーとモジュール定義)
+  │    └── tests/               (命令カテゴリごとのユニットテスト)
+  │         ├── lui.rs
+  │         ├── auipc.rs
+  │         └── ...
+  ├── bus.rs                    (バス・トレイトの定義)
+  └── lib.rs                    (クレートのルート)
+```
 
 ---
 
@@ -17,7 +37,7 @@
 
 ### 1. CPU 構造体 (`Cpu`)
 
-CPUの内部状態を保持します。
+CPUの内部状態を保持します。(`src/cpu.rs`)
 
 ```rust
 pub struct Cpu {
@@ -48,41 +68,26 @@ pub trait Bus {
 }
 ```
 
-### 3. 命令列挙型 (`Instruction`)
+### 3. 命令デコードと実行
 
-デコードされた命令を表現します。RV32I, M, C 拡張をそれぞれカバーします。
-
-```rust
-pub enum Instruction {
-    // RV32I
-    Add(Rd, Rs1, Rs2),
-    Sub(Rd, Rs1, Rs2),
-    // ...
-    // RV32M
-    Mul(Rd, Rs1, Rs2),
-    // ...
-    // RV32C (内部的には対応するRV32I命令に展開するか、独自の型として保持)
-    C_Addi(Rd, Imm),
-}
-```
+現在は速度重視のため、`Instruction` 列挙型を介さず、`execute` メソッド内で直接バイナリをデコードして実行しています。
+デコードロジックは `src/cpu/decode.rs`、各命令の実装は `src/cpu/execute.rs` に集約されています。
 
 ---
 
-## 実行サイクル (Fetch-Decode-Execute)
+## 実行サイクル (Fetch-Execute)
 
 エミュレータのメインループは以下の手順を繰り返します。
 
 1.  **Fetch**: 現在の `pc` から命令を読み取ります。
     - 圧縮命令 (C拡張) の判定（下位2ビットが `11` でなければ16ビット命令）。
-2.  **Decode**: 命令バイナリを `Instruction` 列挙型に変換します。
-3.  **Execute**: 命令に応じた処理を実行し、`regs` や `pc` を更新します。
+2.  **Execute**: 命令バイナリを直接解釈し、処理を実行して `regs` や `pc` を更新します。
 
 ```rust
 impl Cpu {
     pub fn step<B: Bus>(&mut self, bus: &mut B) {
         let inst_bin = self.fetch(bus);
-        let inst = self.decode(inst_bin);
-        self.execute(inst, bus);
+        self.execute(inst_bin, bus);
     }
 }
 ```
@@ -91,7 +96,7 @@ impl Cpu {
 
 ## CSR (Control and Status Registers) 管理
 
-最小限のマシンモード用CSRを実装します。
+最小限のマシンモード用CSRを `src/cpu/csr.rs` で管理します。
 - `mstatus`, `mie`, `mtvec`, `mepc`, `mcause`, `mtval` 等。
 
 ## メモリマップの想定
@@ -109,4 +114,4 @@ impl Cpu {
 
 - **Register Dump**: `Cpu` 構造体に `dump_registers()` メソッドを実装。
 - **Instruction Tracing**: `execute` 前に逆アセンブル結果をログ出力する機能。
-- **Unit Testing**: 命令単位のテストを `src/` 内の各モジュールに配置。
+- **Unit Testing**: 命令単位のテストを `src/cpu/tests/` 配下にカテゴリ別に分割して配置。共有のテスト用モック（`MockBus` 等）は `src/cpu/tests.rs` で定義。
