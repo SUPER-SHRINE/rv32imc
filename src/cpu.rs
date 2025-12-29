@@ -69,6 +69,7 @@ impl Cpu {
         match opcode {
             0b0110111 => self.lui(inst_bin),
             0b0010111 => self.auipc(inst_bin),
+            0b1101111 => self.jal(inst_bin),
             _ => { }
         }
         self.pc += 4;
@@ -77,6 +78,25 @@ impl Cpu {
     fn decode_u_type(&self, inst_bin: u32) -> (usize, u32) {
         let rd = ((inst_bin >> 7) & 0x1f) as usize;
         let imm = inst_bin & 0xffff_f000;
+        (rd, imm)
+    }
+
+    fn decode_j_type(&self, inst_bin: u32) -> (usize, u32) {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let imm20 = (inst_bin >> 31) & 0x1;
+        let imm10_1 = (inst_bin >> 21) & 0x3ff;
+        let imm11 = (inst_bin >> 20) & 0x1;
+        let imm19_12 = (inst_bin >> 12) & 0xff;
+
+        let imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+        
+        // Sign extension from 21st bit
+        let imm = if imm20 != 0 {
+            imm | 0xffe0_0000
+        } else {
+            imm
+        };
+
         (rd, imm)
     }
 
@@ -92,6 +112,14 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.pc.wrapping_add(imm);
         }
+    }
+
+    fn jal(&mut self, inst_bin: u32) {
+        let (rd, imm) = self.decode_j_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.pc.wrapping_add(4);
+        }
+        self.pc = self.pc.wrapping_add(imm);
     }
 }
 
@@ -215,5 +243,67 @@ mod test {
 
         assert_eq!(cpu.regs[0], 0);
         assert_eq!(cpu.pc, 0x1004);
+    }
+
+    // jal 命令によって pc + 4 がレジスタに設定され、PC がジャンプすることを確認
+    #[test]
+    fn test_jal() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        // JAL x1, 0x100 (imm=0x100, rd=1, opcode=1101111)
+        // imm[20]=0, imm[10:1]=0x80, imm[11]=0, imm[19:12]=0
+        // inst[31]=0, inst[30:21]=0x80, inst[20]=0, inst[19:12]=0
+        // inst = 0x00000000 | (0x80 << 21) | (0 << 20) | (0 << 12) | (1 << 7) | 0x6f
+        //      = 0x100000ef
+        let inst_bin = 0x100000ef;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+
+        assert_eq!(cpu.regs[1], 0x1004);
+        assert_eq!(cpu.pc, 0x1100);
+    }
+
+    // jal 命令で x0 レジスタが指定された場合、戻り先アドレスが保存されないことを確認
+    #[test]
+    fn test_jal_x0() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        // JAL x0, 0x100
+        let inst_bin = 0x1000006f;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+
+        assert_eq!(cpu.regs[0], 0);
+        assert_eq!(cpu.pc, 0x1100);
+    }
+
+    // jal 命令で負のオフセットを指定した場合の動作を確認
+    #[test]
+    fn test_jal_neg() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        // JAL x1, -0x100
+        // imm = -0x100 = 0xffffff00
+        // imm[20:1] = 0x1ff00 >> 1 = 0xff80
+        // imm[20] = 1 (inst[31])
+        // imm[10:1] = 0x380 (inst[30:21])
+        // imm[11] = 1 (inst[20])
+        // imm[19:12] = 0xff (inst[19:12])
+        // inst = (1 << 31) | (0x380 << 21) | (1 << 20) | (0xff << 12) | (1 << 7) | 0x6f
+        //      = 0xf00ff0ef (Corrected: inst[30:21] is 0x380, so 0x380 << 21 = 0x70000000)
+        // 0x80000000 | 0x70000000 | 0x00100000 | 0x000ff000 | 0x00000080 | 0x6f
+        // = 0xf01ff0ef
+        let inst_bin = 0xf01ff0ef;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+
+        assert_eq!(cpu.regs[1], 0x1004);
+        assert_eq!(cpu.pc, 0x0f00);
     }
 }
