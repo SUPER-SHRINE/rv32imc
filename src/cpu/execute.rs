@@ -1,3 +1,4 @@
+use crate::cpu::privilege_mode::PrivilegeMode;
 use super::Cpu;
 
 impl Cpu {
@@ -299,4 +300,125 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1] & self.regs[rs2];
         }
     }
-}
+    
+    pub(super) fn ecall(&mut self) {
+        let code = match self.mode {
+            PrivilegeMode::User => 8,
+            PrivilegeMode::Supervisor => 9,
+            PrivilegeMode::Machine => 11,
+        };
+        self.handle_trap(code);
+    }
+    
+    pub(super) fn ebreak(&mut self) {
+        self.handle_trap(3); // Breakpoint exception code is 3
+    }
+
+    pub(super) fn mret(&mut self) {
+        // PC を mepc に復帰
+        self.pc = self.csr.mepc;
+
+        // mstatus の復帰
+        let mpie = (self.csr.mstatus >> 7) & 1;
+        self.csr.mstatus &= !(1 << 3);  // MIE = 0
+        self.csr.mstatus |= mpie << 3;  // MIE = MPIE
+        self.csr.mstatus |= 1 << 7;     // MPIE = 1 (spec says MPIE is set to 1)
+
+        let mpp = (self.csr.mstatus >> 11) & 0b11;
+        self.mode = match mpp {
+            0 => PrivilegeMode::User,
+            1 => PrivilegeMode::Supervisor,
+            3 => PrivilegeMode::Machine,
+            _ => PrivilegeMode::Machine, // Should not happen
+        };
+        // MPP is set to the least-privileged mode supported (User=0)
+        self.csr.mstatus &= !(0b11 << 11);
+    }
+    
+    pub(super) fn csrrw(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let rs1 = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+        let new_val = self.regs[rs1 as usize];
+
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        self.csr.write(csr_addr, new_val);
+    }
+    
+    pub(super) fn csrrs(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let rs1 = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+        let set_mask = self.regs[rs1 as usize];
+
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        if rs1 != 0 {
+            self.csr.write(csr_addr, old_val | set_mask);
+        }
+    }
+    
+    pub(super) fn csrrc(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let rs1 = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+        let clear_mask = self.regs[rs1 as usize];
+
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        if rs1 != 0 {
+            self.csr.write(csr_addr, old_val & !clear_mask);
+        }
+    }
+    
+    pub(super) fn csrrwi(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let uimm = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        self.csr.write(csr_addr, uimm);
+    }
+    
+    pub(super) fn csrrsi(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let uimm = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        if uimm != 0 {
+            self.csr.write(csr_addr, old_val | uimm);
+        }
+    }
+    
+    pub(super) fn csrrci(&mut self, inst_bin: u32) {
+        let csr_addr = (inst_bin >> 20) & 0xfff;
+        let uimm = (inst_bin >> 15) & 0x1f;
+        let rd = (inst_bin >> 7) & 0x1f;
+
+        let old_val = self.csr.read(csr_addr);
+        if rd != 0 {
+            self.regs[rd as usize] = old_val;
+        }
+        if uimm != 0 {
+            self.csr.write(csr_addr, old_val & !uimm);
+        }
+    }
+} 

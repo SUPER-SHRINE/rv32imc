@@ -1,6 +1,7 @@
 mod csr;
-mod execute;
 mod decode;
+mod execute;
+mod handle_trap;
 mod privilege_mode;
 
 #[cfg(test)]
@@ -47,55 +48,6 @@ impl Cpu {
             println!("x{:02}: 0x{:08x}", i, reg);
         }
         println!("pc : 0x{:08x}", self.pc);
-    }
-
-    fn handle_trap(&mut self, exception_code: u32) {
-        // 1. mepc に現在の PC を保存
-        self.csr.mepc = self.pc;
-
-        // 2. mcause に例外コードを設定
-        self.csr.mcause = exception_code;
-
-        // 3. mstatus の更新 (MPP, MPIE, MIE)
-        // mstatus bit fields:
-        // MIE:  bit 3
-        // MPIE: bit 7
-        // MPP:  bits 11-12
-        let mie = (self.csr.mstatus >> 3) & 1;
-        self.csr.mstatus &= !(1 << 7); // MPIE = 0
-        self.csr.mstatus |= mie << 7;  // MPIE = MIE
-        self.csr.mstatus &= !(1 << 3); // MIE = 0
-
-        let mpp = self.mode as u32;
-        self.csr.mstatus &= !(0b11 << 11); // MPP = 0
-        self.csr.mstatus |= mpp << 11;     // MPP = mode
-
-        // 4. 特権モードを Machine に遷移
-        self.mode = PrivilegeMode::Machine;
-
-        // 5. mtvec のアドレスへジャンプ
-        self.pc = self.csr.mtvec;
-    }
-
-    fn mret(&mut self) {
-        // PC を mepc に復帰
-        self.pc = self.csr.mepc;
-
-        // mstatus の復帰
-        let mpie = (self.csr.mstatus >> 7) & 1;
-        self.csr.mstatus &= !(1 << 3);  // MIE = 0
-        self.csr.mstatus |= mpie << 3;  // MIE = MPIE
-        self.csr.mstatus |= 1 << 7;     // MPIE = 1 (spec says MPIE is set to 1)
-
-        let mpp = (self.csr.mstatus >> 11) & 0b11;
-        self.mode = match mpp {
-            0 => PrivilegeMode::User,
-            1 => PrivilegeMode::Supervisor,
-            3 => PrivilegeMode::Machine,
-            _ => PrivilegeMode::Machine, // Should not happen
-        };
-        // MPP is set to the least-privileged mode supported (User=0)
-        self.csr.mstatus &= !(0b11 << 11);
     }
 
     fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> u32 {
@@ -199,115 +151,37 @@ impl Cpu {
                 let funct3 = (inst_bin >> 12) & 0x7;
                 let imm11_0 = (inst_bin >> 20) & 0xfff;
 
-                match (funct3, imm11_0) {
-                    (0b000, 0b000000000000) => {
-                        // ECALL
-                        let code = match self.mode {
-                            PrivilegeMode::User => 8,
-                            PrivilegeMode::Supervisor => 9,
-                            PrivilegeMode::Machine => 11,
-                        };
-                        self.handle_trap(code);
-                    }
-                    (0b000, 0b000000000001) => {
-                        // EBREAK
-                        self.handle_trap(3); // Breakpoint exception code is 3
-                    }
-                    (0b000, 0b001100000010) => {
-                        // MRET
-                        self.mret();
-                    }
-                    (0b001, _) => {
-                        // CSRRW
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let rs1 = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-                        let new_val = self.regs[rs1 as usize];
-
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
+                match funct3 {
+                    0b000 => {
+                        match imm11_0 {
+                            0b000000000000 => self.ecall(),
+                            0b000000000001 => self.ebreak(),
+                            0b001100000010 => self.mret(),
+                            _ => (),
                         }
-                        self.csr.write(csr_addr, new_val);
+                    },
+                    0b001 => {
+                        self.csrrw(inst_bin);
+                        self.pc += 4;
+                    },
+                    0b010 => {
+                        self.csrrs(inst_bin);
                         self.pc += 4;
                     }
-                    (0b010, _) => {
-                        // CSRRS
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let rs1 = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-                        let set_mask = self.regs[rs1 as usize];
-
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
-                        }
-                        if rs1 != 0 {
-                            self.csr.write(csr_addr, old_val | set_mask);
-                        }
+                    0b011 => {
+                        self.csrrc(inst_bin);
                         self.pc += 4;
                     }
-                    (0b011, _) => {
-                        // CSRRC
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let rs1 = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-                        let clear_mask = self.regs[rs1 as usize];
-
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
-                        }
-                        if rs1 != 0 {
-                            self.csr.write(csr_addr, old_val & !clear_mask);
-                        }
+                    0b101 => {
+                        self.csrrwi(inst_bin);
                         self.pc += 4;
                     }
-                    (0b101, _) => {
-                        // CSRRWI
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let uimm = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
-                        }
-                        self.csr.write(csr_addr, uimm);
+                    0b110 => {
+                        self.csrrsi(inst_bin);
                         self.pc += 4;
                     }
-                    (0b110, _) => {
-                        // CSRRSI
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let uimm = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
-                        }
-                        if uimm != 0 {
-                            self.csr.write(csr_addr, old_val | uimm);
-                        }
-                        self.pc += 4;
-                    }
-                    (0b111, _) => {
-                        // CSRRCI
-                        let csr_addr = (inst_bin >> 20) & 0xfff;
-                        let uimm = (inst_bin >> 15) & 0x1f;
-                        let rd = (inst_bin >> 7) & 0x1f;
-
-                        let old_val = self.csr.read(csr_addr);
-                        if rd != 0 {
-                            self.regs[rd as usize] = old_val;
-                        }
-                        if uimm != 0 {
-                            self.csr.write(csr_addr, old_val & !uimm);
-                        }
+                    0b111 => {
+                        self.csrrci(inst_bin);
                         self.pc += 4;
                     }
                     _ => {
