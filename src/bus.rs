@@ -1,3 +1,5 @@
+pub mod default_bus;
+
 /// メモリの読み書きを行うためのバス。
 /// 実装は外側に任せる。
 pub trait Bus {
