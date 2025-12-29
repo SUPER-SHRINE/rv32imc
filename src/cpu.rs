@@ -77,6 +77,7 @@ impl Cpu {
             }
             0b1101111 => self.jal(inst_bin),
             0b1100111 => self.jalr(inst_bin),
+            0b1100011 => self.beq(inst_bin),
             _ => {
                 self.pc += 4;
             }
@@ -116,6 +117,27 @@ impl Cpu {
         (rd, imm)
     }
 
+    fn decode_b_type(&self, inst_bin: u32) -> (usize, usize, u32, u32) {
+        let imm12 = (inst_bin >> 31) & 0x1;
+        let imm10_5 = (inst_bin >> 25) & 0x3f;
+        let rs2 = ((inst_bin >> 20) & 0x1f) as usize;
+        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+        let funct3 = (inst_bin >> 12) & 0x7;
+        let imm4_1 = (inst_bin >> 8) & 0xf;
+        let imm11 = (inst_bin >> 7) & 0x1;
+
+        let imm = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
+
+        // Sign extension from 13th bit
+        let imm = if imm12 != 0 {
+            imm | 0xffffe000
+        } else {
+            imm
+        };
+
+        (rs1, rs2, funct3, imm)
+    }
+
     fn lui(&mut self, inst_bin: u32) {
         let (rd, imm) = self.decode_u_type(inst_bin);
         if rd != 0 {
@@ -146,6 +168,15 @@ impl Cpu {
             self.regs[rd] = t;
         }
         self.pc = target;
+    }
+
+    fn beq(&mut self, inst_bin: u32) {
+        let (rs1, rs2, _funct3, imm) = self.decode_b_type(inst_bin);
+        if self.regs[rs1] == self.regs[rs2] {
+            self.pc = self.pc.wrapping_add(imm);
+        } else {
+            self.pc = self.pc.wrapping_add(4);
+        }
     }
 }
 
@@ -376,5 +407,52 @@ mod test {
         bus.write_inst32(0x1004, inst_bin);
         cpu.step(&mut bus);
         assert_eq!(cpu.pc, 0x2010);
+    }
+
+    // beq 命令によって条件一致時にジャンプし、条件不一致時に PC + 4 進むことを確認
+    #[test]
+    fn test_beq() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        cpu.regs[1] = 10;
+        cpu.regs[2] = 10;
+        // BEQ x1, x2, 0x100 (imm=0x100, rs1=1, rs2=2, funct3=0, opcode=1100011)
+        // imm[12]=0, imm[11]=0, imm[10:5]=0x08, imm[4:1]=0
+        // inst[31]=0, inst[7]=0, inst[30:25]=0x08, inst[11:8]=0
+        // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (0 << 12) | (0 << 7) | 0x63
+        //      = 0x10208063
+        let inst_bin = 0x10208063;
+        bus.write_inst32(0x1000, inst_bin);
+
+        // 条件一致
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1100);
+
+        // 条件不一致
+        cpu.pc = 0x1000;
+        cpu.regs[2] = 20;
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x1004);
+    }
+
+    // beq 命令で負のオフセットを指定した場合の動作を確認
+    #[test]
+    fn test_beq_neg() {
+        let mut cpu = Cpu::new(0x1000);
+        let mut bus = MockBus::new();
+
+        cpu.regs[1] = 10;
+        cpu.regs[2] = 10;
+        // BEQ x1, x2, -0x100 (imm=-0x100 = 0xffffff00)
+        // imm[12]=1, imm[11]=1, imm[10:5]=0x38, imm[4:1]=0
+        // inst[31]=1, inst[7]=1, inst[30:25]=0x38, inst[11:8]=0
+        // inst = (1 << 31) | (0x38 << 25) | (2 << 20) | (1 << 15) | (0 << 12) | (1 << 7) | 0x63
+        //      = 0xf02080e3
+        let inst_bin = 0xf02080e3;
+        bus.write_inst32(0x1000, inst_bin);
+
+        cpu.step(&mut bus);
+        assert_eq!(cpu.pc, 0x0f00);
     }
 }
