@@ -269,4 +269,12 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
         }
     }
+
+    pub(super) fn srl(&mut self, inst_bin: u32) {
+        let (rd, rs1, rs2, _funct3, _funct7) = self.decode_r_type(inst_bin);
+        let shamt = self.regs[rs2] & 0x1f;
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1] >> shamt;
+        }
+    }
 }
