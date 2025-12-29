@@ -74,6 +74,7 @@ impl Cpu {
                     0b011 => self.sltiu(inst_bin),
                     0b100 => self.xori(inst_bin),
                     0b110 => self.ori(inst_bin),
+                    0b111 => self.andi(inst_bin),
                     _ => {}
                 }
                 self.pc += 4;
