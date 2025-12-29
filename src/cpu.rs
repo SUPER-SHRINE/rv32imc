@@ -140,6 +140,11 @@ impl Cpu {
                 }
                 self.pc += 4;
             }
+            0b0001111 => {
+                // FENCE, FENCE.I
+                // 現在の実装では NOP 扱い
+                self.pc += 4;
+            }
             _ => {
                 self.pc += 4;
             }
