@@ -129,3 +129,31 @@ fn test_sltiu() {
     assert_eq!(cpu.regs[6], 1);
     assert_eq!(cpu.pc, 16);
 }
+
+#[test]
+fn test_xori() {
+    let mut cpu = Cpu::new(0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0xAAAA_AAAA
+    cpu.regs[1] = 0xAAAA_AAAA;
+    // XORI x2, x1, 0x555 (x2 = 0xAAAA_AAAA ^ 0x00000555) -> 0xAAAA_AFFF
+    // opcode: 0010011, funct3: 100, rd: 00010, rs1: 00001, imm: 010101010101
+    // 010101010101 00001 100 00010 0010011
+    // 0x5550c113
+    let inst = 0x5550c113;
+    bus.write_inst32(0, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 0xAAAA_AAAA ^ 0x0000_0555);
+    assert_eq!(cpu.pc, 4);
+
+    // XORI x3, x1, -1 (NOT x1) (x3 = 0xAAAA_AAAA ^ 0xFFFF_FFFF) -> 0x5555_5555
+    // imm: -1 -> 0xfff (12bit)
+    // 111111111111 00001 100 00011 0010011
+    // 0xfff0c193
+    let inst = 0xfff0c193;
+    bus.write_inst32(4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0x5555_5555);
+    assert_eq!(cpu.pc, 8);
+}
