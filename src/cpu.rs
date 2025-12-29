@@ -70,6 +70,7 @@ impl Cpu {
                 let funct3 = (inst_bin >> 12) & 0x7;
                 match funct3 {
                     0b000 => self.addi(inst_bin),
+                    0b001 => self.slli(inst_bin),
                     0b010 => self.slti(inst_bin),
                     0b011 => self.sltiu(inst_bin),
                     0b100 => self.xori(inst_bin),
