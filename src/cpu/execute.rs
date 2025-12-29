@@ -170,4 +170,11 @@ impl Cpu {
             };
         }
     }
+
+    pub(super) fn sltiu(&mut self, inst_bin: u32) {
+        let (rd, rs1, _funct3, imm) = self.decode_i_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = if self.regs[rs1] < imm { 1 } else { 0 };
+        }
+    }
 }

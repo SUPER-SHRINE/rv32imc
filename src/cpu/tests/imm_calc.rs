@@ -80,3 +80,52 @@ fn test_slti() {
     assert_eq!(cpu.regs[5], 0);
     assert_eq!(cpu.pc, 16);
 }
+
+#[test]
+fn test_sltiu() {
+    let mut cpu = Cpu::new(0);
+    let mut bus = MockBus::new();
+
+    // SLTIU x1, x0, 10 (x1 = 0 < 10 ? 1 : 0) -> 1
+    // opcode: 0010011, funct3: 011, rd: 00001, rs1: 00000, imm: 000000001010
+    // 000000001010 00000 011 00001 0010011
+    // 0x00a03093
+    let inst = 0x00a03093;
+    bus.write_inst32(0, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 1);
+    assert_eq!(cpu.pc, 4);
+
+    // SLTIU x2, x0, -1 (x2 = 0 < (unsigned)0xffffffff ? 1 : 0) -> 1
+    // imm: -1 -> 0xfff (12bit) -> sign_extend -> 0xffffffff
+    // 111111111111 00000 011 00010 0010011
+    // 0xfff03113
+    let inst = 0xfff03113;
+    bus.write_inst32(4, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 1);
+    assert_eq!(cpu.pc, 8);
+
+    // x3 = 0xffffffff
+    cpu.regs[3] = 0xffff_ffff;
+    // SLTIU x4, x3, 10 (x4 = 0xffffffff < 10 ? 1 : 0) -> 0
+    // 000000001010 00011 011 00100 0010011
+    // 0x00a1b213
+    let inst = 0x00a1b213;
+    bus.write_inst32(8, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[4], 0);
+    assert_eq!(cpu.pc, 12);
+
+    // x5 = 0xfffffffe
+    cpu.regs[5] = 0xffff_fffe;
+    // SLTIU x6, x5, -1 (x6 = 0xfffffffe < 0xffffffff ? 1 : 0) -> 1
+    // imm: -1 -> 0xfff -> 0xffffffff
+    // 111111111111 00101 011 00110 0010011
+    // 0xfff2b313
+    let inst = 0xfff2b313;
+    bus.write_inst32(12, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[6], 1);
+    assert_eq!(cpu.pc, 16);
+}
