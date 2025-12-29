@@ -4,6 +4,7 @@ mod jump;
 mod load;
 mod lui;
 mod store;
+mod imm_calc;
 
 pub(super) use crate::bus::Bus;
 

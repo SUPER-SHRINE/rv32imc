@@ -66,6 +66,14 @@ impl Cpu {
             }
             0b1101111 => self.jal(inst_bin),
             0b1100111 => self.jalr(inst_bin),
+            0b0010011 => {
+                let funct3 = (inst_bin >> 12) & 0x7;
+                match funct3 {
+                    0b000 => self.addi(inst_bin),
+                    _ => {}
+                }
+                self.pc += 4;
+            }
             0b1100011 => {
                 let funct3 = (inst_bin >> 12) & 0x7;
                 match funct3 {
