@@ -127,6 +127,7 @@ impl Cpu {
                 let funct7 = (inst_bin >> 25) & 0x7f;
                 match (funct3, funct7) {
                     (0b000, 0b0000000) => self.add(inst_bin),
+                    (0b000, 0b0100000) => self.sub(inst_bin),
                     _ => {}
                 }
                 self.pc += 4;

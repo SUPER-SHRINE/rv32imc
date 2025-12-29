@@ -229,4 +229,11 @@ impl Cpu {
             self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]);
         }
     }
+
+    pub(super) fn sub(&mut self, inst_bin: u32) {
+        let (rd, rs1, rs2, _funct3, _funct7) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]);
+        }
+    }
 }
