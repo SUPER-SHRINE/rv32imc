@@ -1,5 +1,5 @@
 use crate::cpu::Cpu;
-use crate::cpu::tests::MockBus;
+use crate::cpu::tests::mock_bus::MockBus;
 
 #[test]
 fn test_csrrw() {

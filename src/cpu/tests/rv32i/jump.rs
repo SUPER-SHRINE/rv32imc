@@ -1,5 +1,5 @@
 use crate::cpu::Cpu;
-use super::MockBus;
+use crate::cpu::tests::mock_bus::MockBus;
 
 // jal 命令によって pc + 4 がレジスタに設定され、PC がジャンプすることを確認
 #[test]
