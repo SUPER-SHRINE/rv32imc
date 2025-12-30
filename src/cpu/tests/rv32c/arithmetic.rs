@@ -301,3 +301,64 @@ fn test_c_lui_reserved() {
         _ => panic!("Should trap"),
     }
 }
+
+#[test]
+fn test_c_srli() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // rd' = x8 (s0), x8 に 0x0000_00F0 をセット
+    cpu.regs[8] = 0x0000_00F0;
+
+    // c.srli x8, 4
+    // quadrant: 01, funct3: 100, funct2: 00
+    // rd': x8-x15 のオフセット (x8 は 000)
+    // shamt: 4 (000100)
+    // shamt[5] (inst[12]): 0
+    // shamt[4:0] (inst[6:2]): 00100
+    // inst: 100 0 00 000 00100 01 -> 0b1000000000001001 -> 0x8011
+    let inst = 0x8011;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[8], 0x0000_000F);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.srli x9, 1
+    // rd' = x9 (s1) -> 001
+    // shamt: 1 (000001)
+    // cpu.regs[9] = 1
+    cpu.regs[9] = 1;
+    // inst: 100 0 00 001 00001 01 -> 0b1000000010000101 -> 0x8085
+    let inst = 0x8085;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[9], 0);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_c_srli_hint_and_reserved() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+    cpu.csr.mtvec = 0x100;
+
+    // c.srli x8, 0 (HINT)
+    // inst: 100 0 00 000 00000 01 -> 0x8001
+    cpu.regs[8] = 0x1234;
+    bus.write_inst16(0x0, 0x8001);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[8], 0x1234); // Should not change
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.srli x8, 32 (shamt[5] = 1, Reserved for RV32C)
+    // inst: 100 1 00 000 00000 01 -> 0x9001
+    bus.write_inst16(0x2, 0x9001);
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap for shamt[5]=1 in RV32C"),
+    }
+    assert_eq!(cpu.pc, 0x100);
+}

@@ -191,6 +191,14 @@ impl Cpu {
         imm
     }
 
+    pub(super) fn decode_cb_shamt_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
+        let shamt5 = (inst_bin >> 12) & 0x1;
+        let shamt4_0 = (inst_bin >> 2) & 0x1f;
+        let shamt = (shamt5 << 5) | shamt4_0;
+        (8 + rd_prime, shamt as u32)
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }
@@ -207,6 +215,10 @@ impl Cpu {
         inst_bin & 0x3
     }
 
+    pub(super) fn decode_c_funct2(&self, inst_bin: u16) -> u16 {
+        (inst_bin >> 10) & 0x3
+    }
+    
     pub(super) fn decode_c_funct3(&self, inst_bin: u16) -> u16 {
         (inst_bin >> 13) & 0x7
     }

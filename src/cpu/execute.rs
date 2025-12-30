@@ -660,4 +660,18 @@ impl Cpu {
         self.regs[rd] = imm_u32;
         StepResult::Ok
     }
+
+    pub(super) fn c_srli(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
+        // shamt[5] must be 0 for RV32C
+        if (inst_bin >> 12) & 0x1 != 0 {
+            return self.handle_trap(2);
+        }
+        if shamt == 0 {
+            // shamt=0 is reserved for HINTs
+            return StepResult::Ok;
+        }
+        self.regs[rd] >>= shamt;
+        StepResult::Ok
+    }
 }
