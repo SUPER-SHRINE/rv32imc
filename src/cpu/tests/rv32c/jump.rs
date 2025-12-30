@@ -242,3 +242,46 @@ fn test_c_jal_max_backward() {
     assert_eq!(cpu.pc, 0x1000 - 2048);
     assert_eq!(cpu.regs[1], 0x1002);
 }
+
+#[test]
+fn test_c_j_positive() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.j 100
+    // PC = 0x200
+    // PC = 0x200 + 100 = 0x264
+    
+    // c.jal 100 was 0x2095 (funct3 = 001)
+    // c.j 100 has funct3 = 101
+    // inst = 0x2095 | (0b101 << 13) & (0x101 << 13 is wrong since 001 was already there)
+    // 0x2095 bits: 001 0 0 00 0 1 0 010 1 01
+    // c.j 100 bits: 101 0 0 00 0 1 0 010 1 01 = 0xa095
+    
+    let inst = 0xa095;
+    bus.write_inst16(0x200, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 + 100);
+    assert_eq!(cpu.regs[1], 0); // x1 should not be changed
+}
+
+#[test]
+fn test_c_j_negative() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.j -100
+    // PC = 0x200
+    // PC = 0x200 - 100 = 0x19c
+    
+    // c.jal -100 was 0x3f71 (funct3 = 001)
+    // c.j -100 bits: 101 1 1 11 1 0 1 110 0 01 = 0xbf71
+    
+    let inst = 0xbf71;
+    bus.write_inst16(0x200, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 - 100);
+    assert_eq!(cpu.regs[1], 0); // x1 should not be changed
+}
