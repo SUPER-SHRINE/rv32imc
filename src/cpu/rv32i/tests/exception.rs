@@ -1,6 +1,11 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
+
+#[allow(unused_imports)]
 use crate::cpu::privilege_mode::PrivilegeMode;
-use crate::cpu::tests::mock_bus::MockBus;
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::MockBus;
 
 #[test]
 fn test_ecall_user() {

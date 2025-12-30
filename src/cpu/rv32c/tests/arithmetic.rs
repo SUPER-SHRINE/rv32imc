@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
-use crate::cpu::tests::mock_bus::MockBus;
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::MockBus;
 
 #[test]
 fn test_c_addi4spn_min() {

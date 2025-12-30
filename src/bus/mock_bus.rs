@@ -1,21 +1,26 @@
-pub(super) use crate::bus::Bus;
+pub(crate) use crate::bus::Bus;
 
-pub(super) struct MockBus {
+// テストコードでのみ使用している構造体のため通常ビルド時に未使用の警告が出る(邪魔なので握り潰す)
+#[allow(unused)]
+pub(crate) struct MockBus {
     memory: [u8; 8192],
 }
 
 impl MockBus {
-    pub(super) fn new() -> Self {
+    #[allow(unused)]
+    pub(crate) fn new() -> Self {
         Self {
             memory: [0; 8192],
         }
     }
 
-    pub(super) fn write_inst32(&mut self, addr: u32, inst: u32) {
+    #[allow(unused)]
+    pub(crate) fn write_inst32(&mut self, addr: u32, inst: u32) {
         self.write32(addr, inst);
     }
 
-    pub(super) fn write_inst16(&mut self, addr: u32, inst: u16) {
+    #[allow(unused)]
+    pub(crate) fn write_inst16(&mut self, addr: u32, inst: u16) {
         self.write16(addr, inst);
     }
 }

@@ -1,4 +1,5 @@
 pub mod default_bus;
+pub mod mock_bus;
 
 /// メモリの読み書きを行うためのバス。
 /// 実装は外側に任せる。

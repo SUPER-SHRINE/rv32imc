@@ -16,19 +16,24 @@
 
 ```text
 src/
-  ├── cpu.rs                    (Cpu構造体の定義とメインループ)
-  ├── cpu/
-  │    ├── decode.rs            (命令のデコードロジック)
-  │    ├── execute.rs           (各命令の具体的な実行処理)
-  │    ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
-  │    ├── privilege_mode.rs    (特権モードの定義)
-  │    ├── tests.rs             (テスト用ヘルパーとモジュール定義)
-  │    └── tests/               (命令カテゴリごとのユニットテスト)
-  │         ├── lui.rs
-  │         ├── auipc.rs
-  │         └── ...
+  ├── main.rs                   (バイナリエントリポイント)
+  ├── lib.rs                    (クレートのルート)
   ├── bus.rs                    (バス・トレイトの定義)
-  └── lib.rs                    (クレートのルート)
+  ├── bus/
+  │    ├── default_bus.rs       (標準的なメモリ実装)
+  │    └── mock_bus.rs          (テスト用のモック実装)
+  ├── cpu.rs                    (Cpu構造体の定義とメインループ)
+  └── cpu/
+       ├── decode.rs            (命令の共通デコードロジック)
+       ├── handle_trap.rs       (例外・トラップ処理の実装)
+       ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
+       ├── privilege_mode.rs    (特権モードの定義)
+       ├── rv32i.rs             (RV32I 命令のディスパッチ)
+       ├── rv32m.rs             (RV32M 命令のディスパッチ)
+       ├── rv32c.rs             (RV32C 命令のディスパッチ)
+       ├── rv32i/               (RV32I 命令の各実装とテスト)
+       ├── rv32m/               (RV32M 命令の各実装とテスト)
+       └── rv32c/               (RV32C 命令の各実装とテスト)
 ```
 
 ---
@@ -47,7 +52,7 @@ pub struct Cpu {
     pub pc: u32,
     /// 制御ステータスレジスタ (CSR)
     pub csr: Csr,
-    /// 特権モード (現在は Machine Mode のみ)
+    /// 特権モード
     pub mode: PrivilegeMode,
 }
 ```
@@ -71,7 +76,7 @@ pub trait Bus {
 ### 3. 命令デコードと実行
 
 現在は速度重視のため、`Instruction` 列挙型を介さず、`execute` メソッド内で直接バイナリをデコードして実行しています。
-デコードロジックは `src/cpu/decode.rs`、各命令の実装は `src/cpu/execute.rs` に集約されています。
+デコードロジックは `src/cpu/decode.rs`、各拡張ごとの命令実行は `src/cpu/rv32*.rs` および `src/cpu/rv32*/exec.rs` に集約されています。
 
 ---
 
@@ -80,18 +85,25 @@ pub trait Bus {
 エミュレータのメインループは以下の手順を繰り返します。
 
 1.  **Fetch**: 現在の `pc` から命令を読み取ります。
-    - 現状は 32ビット固定で読み込みを行っています。
-    - 将来的な C拡張サポート時には、圧縮命令の判定（下位2ビットが `11` でなければ16ビット命令）を行う予定です。
-2.  **Execute**: 命令バイナリを直接解釈し、処理を実行して `regs` や `pc` を更新します。
+    - 下位2ビットが `11` でなければ16ビット命令（C拡張）として扱います。
+    - 32ビット命令の場合は `(inst_bin, 0)`、16ビット命令の場合は `(quadrant, inst16)` のような形式でフェッチされます。
+2.  **Execute**: 命令バイナリを各拡張モジュール (`rv32i`, `rv32m`, `rv32c`) に振り分けて実行し、`regs` や `pc` を更新します。
 
 ```rust
 impl Cpu {
-    pub fn step<B: Bus>(&mut self, bus: &mut B) {
-        let inst_bin = self.fetch(bus);
-        self.execute(inst_bin, bus);
+    pub fn step<B: Bus>(&mut self, bus: &mut B) -> StepResult {
+        let (inst_bin, inst16) = self.fetch(bus);
+        if inst16 == 0 {
+            self.execute32(inst_bin, bus)
+        } else {
+            let quadrant = (inst16 & 0b11) as u16;
+            self.execute16(inst16, quadrant, bus)
+        }
     }
 }
 ```
+
+`StepResult` は、命令実行の結果（正常終了、ジャンプ発生、トラップ発生など）を呼び出し元に伝えるための列挙型です。
 
 ---
 
@@ -115,5 +127,4 @@ impl Cpu {
 `overview.md` の方針に従い、以下の機能を実装します。
 
 - **Register Dump**: `Cpu` 構造体に `dump_registers()` メソッドを実装。
-- **Instruction Tracing**: `execute` 前に逆アセンブル結果をログ出力する機能。
 - **Unit Testing**: 命令単位のテストを `src/cpu/tests/` 配下にカテゴリ別に分割して配置。共有のテスト用モック（`MockBus` 等）は `src/cpu/tests.rs` で定義。

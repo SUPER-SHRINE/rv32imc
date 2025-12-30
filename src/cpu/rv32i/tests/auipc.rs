@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
-use crate::cpu::tests::mock_bus::MockBus;
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::MockBus;
 
 // auipc 命令によって PC + 0x12345000 がレジスタに設定され、PC が +4 進むことを確認
 #[test]

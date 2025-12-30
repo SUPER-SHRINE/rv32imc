@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
-use crate::cpu::tests::mock_bus::{Bus, MockBus};
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::{Bus, MockBus};
 
 #[test]
 fn test_lb() {

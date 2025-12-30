@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
-use crate::cpu::tests::mock_bus::MockBus;
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::MockBus;
 
 // jal 命令によって pc + 4 がレジスタに設定され、PC がジャンプすることを確認
 #[test]

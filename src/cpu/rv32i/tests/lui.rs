@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::cpu::Cpu;
-use crate::cpu::tests::mock_bus::MockBus;
+
+#[allow(unused_imports)]
+use crate::bus::mock_bus::MockBus;
 
 // lui 命令によってレジスタの値が正しく設定され、PC が +4 進むことを確認
 #[test]
