@@ -253,6 +253,12 @@ impl Cpu {
                                 self.c_mv(inst_bin)
                             }
                         }
+                        0b1001 => {
+                            let rd = (inst_bin >> 7) & 0x1f;
+                            if rd == 0 && rs2 == 0 {
+                                self.ebreak()
+                            }
+                        }
                         _ => self.handle_trap(2),
                     }
                 }
