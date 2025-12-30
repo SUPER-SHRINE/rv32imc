@@ -76,3 +76,50 @@ fn test_c_lw_various_regs() {
     assert_eq!(cpu.regs[8], 0xAAAABBBB);
     assert_eq!(cpu.pc, 0x2);
 }
+
+#[test]
+fn test_c_lwsp() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // SP = 0x100
+    cpu.regs[2] = 0x100;
+
+    // メモリ準備: アドレス 0x100 + 252 = 0x1FC に 0x11223344 を書き込む
+    bus.write32(0x1FC, 0x11223344);
+
+    // c.lwsp x10, 252(sp)
+    // quadrant: 10
+    // funct3: 010
+    // rd: 01010 (x10/a0)
+    // imm: 252 = 0b11111100 -> imm[7:2]=111111 -> imm[7:6]=11, imm[5]=1, imm[4:2]=111
+    // inst bits: 010 (funct3) 1 (imm[5]) 01010 (rd) 111 (imm[4:2]) 11 (imm[7:6]) 10 (op)
+    // 010 1 01010 111 11 10 -> 0b0101_0101_0111_1110 = 0x557e
+    let inst = 0x557e;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0x11223344);
+    assert_eq!(cpu.pc, 0x2);
+}
+
+#[test]
+fn test_c_lwsp_zero_offset() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // SP = 0x200
+    cpu.regs[2] = 0x200;
+    bus.write32(0x200, 0x99887766);
+
+    // c.lwsp x1, 0(sp)
+    // imm: 0
+    // rd: 00001 (x1/ra)
+    // inst bits: 010 0 00001 000 00 10 -> 0b0100_0000_1000_0010 = 0x4082
+    let inst = 0x4082;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0x99887766);
+    assert_eq!(cpu.pc, 0x2);
+}

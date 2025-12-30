@@ -606,6 +606,16 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn c_lwsp<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rd, imm) = self.decode_c_lwsp_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        let addr = self.regs[2].wrapping_add(imm);
+        self.regs[rd] = bus.read32(addr);
+        StepResult::Ok
+    }
+
     pub(super) fn c_sw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
         let (rs1, rs2, imm) = self.decode_cs_type(inst_bin);
         let addr = self.regs[rs1].wrapping_add(imm);

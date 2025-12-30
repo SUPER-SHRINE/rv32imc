@@ -276,4 +276,21 @@ impl Cpu {
     pub(super) fn decode_c_funct6(&self, inst_bin: u16) -> u16 {
         (inst_bin >> 10) & 0x3f
     }
+
+    pub(super) fn decode_c_lwsp_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+
+        // imm[5|4:2|7:6] bit structure in C.LWSP:
+        // inst[12] -> imm[5]
+        // inst[6:4] -> imm[4:2]
+        // inst[3:2] -> imm[7:6]
+
+        let i5 = (inst_bin >> 12) & 0x1;
+        let i4_2 = (inst_bin >> 4) & 0x7;
+        let i7_6 = (inst_bin >> 2) & 0x3;
+
+        let imm = (i7_6 << 6) | (i5 << 5) | (i4_2 << 2);
+
+        (rd, imm as u32)
+    }
 }

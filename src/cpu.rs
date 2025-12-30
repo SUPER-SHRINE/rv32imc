@@ -242,6 +242,7 @@ impl Cpu {
             },
             0b10 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_slli(inst_bin),
+                0b010 => self.c_lwsp(inst_bin, bus),
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),
