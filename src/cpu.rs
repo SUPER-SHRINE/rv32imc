@@ -108,19 +108,45 @@ impl Cpu {
                 0b000 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.add(inst_bin),
                     0b0100000 => self.sub(inst_bin),
+                    0b0000001 => self.mul(inst_bin),
                     _ => self.handle_trap(2),
                 },
-                0b001 => self.sll(inst_bin),
-                0b010 => self.slt(inst_bin),
-                0b011 => self.sltu(inst_bin),
-                0b100 => self.xor(inst_bin),
+                0b001 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.sll(inst_bin),
+                    0b0000001 => self.mulh(inst_bin),
+                    _ => self.handle_trap(2),
+                },
+                0b010 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.slt(inst_bin),
+                    0b0000001 => self.mulhsu(inst_bin),
+                    _ => self.handle_trap(2),
+                },
+                0b011 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.sltu(inst_bin),
+                    0b0000001 => self.mulhu(inst_bin),
+                    _ => self.handle_trap(2),
+                },
+                0b100 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.xor(inst_bin),
+                    0b0000001 => self.div(inst_bin),
+                    _ => self.handle_trap(2),
+                },
                 0b101 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.srl(inst_bin),
                     0b0100000 => self.sra(inst_bin),
+                    0b0000001 => self.divu(inst_bin),
                     _ => self.handle_trap(2),
                 },
-                0b110 => self.or(inst_bin),
-                0b111 => self.and(inst_bin),
+                0b110 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.or(inst_bin),
+                    0b0000001 => self.rem(inst_bin),
+                    _ => self.handle_trap(2),
+                },
+                0b111 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.and(inst_bin),
+                    0b0000001 => self.remu(inst_bin),
+                    _ => self.handle_trap(2),
+                },
                 _ => self.handle_trap(2),
             }
             0b0001111 => match self.decode_funct3(inst_bin) {
