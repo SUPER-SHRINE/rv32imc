@@ -1,0 +1,48 @@
+FROM ubuntu:22.04
+
+# 必要なパッケージのインストール
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    autotools-dev \
+    curl \
+    python3 \
+    libmpc-dev \
+    libmpfr-dev \
+    libgmp-dev \
+    gawk \
+    build-essential \
+    bison \
+    flex \
+    texinfo \
+    gperf \
+    libtool \
+    patchutils \
+    bc \
+    zlib1g-dev \
+    libexpat-dev \
+    git \
+    ninja-build \
+    gcc-riscv64-unknown-elf
+
+# riscv-tests のクローン
+WORKDIR /work
+RUN git clone https://github.com/riscv-software-src/riscv-tests.git && \
+    cd riscv-tests && \
+    git submodule update --init --recursive
+
+# ビルド（RV32I 用）
+# 仮想メモリ版 (-v-) など一部のテストはビルドに失敗する可能性がありますが、
+# 物理メモリ版 (-p-) が生成されれば良いため、-k オプションでエラーを無視して進めます。
+WORKDIR /work/riscv-tests
+RUN autoconf && \
+    ./configure --prefix=/work/riscv-tests/build && \
+    make -k isa || true
+
+# バイナリを抽出するための準備
+RUN mkdir -p /work/output && \
+    find isa -maxdepth 1 -type f -executable -name "rv32u[imc]-p-*" -exec cp {} /work/output/ \; && \
+    cd /work/output && \
+    for f in rv32u[imc]-p-*; do riscv64-unknown-elf-objcopy -O binary $f $f.bin; done
+
+CMD ["tar", "cvf", "-", "-C", "/work/output", "."]
