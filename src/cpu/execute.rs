@@ -544,4 +544,16 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn mulhu(&mut self, inst_bin: u32) -> StepResult {
+        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            let src1 = self.regs[rs1] as u64;
+            let src2 = self.regs[rs2] as u64;
+            let result = src1 * src2;
+            self.regs[rd] = (result >> 32) as u32;
+        }
+        self.pc += 4;
+        StepResult::Ok
+    }
+
 }
