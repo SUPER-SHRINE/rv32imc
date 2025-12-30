@@ -688,4 +688,10 @@ impl Cpu {
         self.regs[rd] = ((self.regs[rd] as i32) >> shamt) as u32;
         StepResult::Ok
     }
+
+    pub(super) fn c_andi(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_cb_andi_type(inst_bin);
+        self.regs[rd] &= imm;
+        StepResult::Ok
+    }
 }

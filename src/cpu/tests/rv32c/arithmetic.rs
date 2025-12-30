@@ -424,3 +424,56 @@ fn test_c_srai_hint_and_reserved() {
     }
     assert_eq!(cpu.pc, 0x100);
 }
+
+#[test]
+fn test_c_andi() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // rd' = x8 (s0), x8 に 0b1111 (15) をセット
+    cpu.regs[8] = 0b1111;
+
+    // c.andi x8, 1
+    // quadrant: 01, funct3: 100, funct2: 10
+    // rd': x8 (000)
+    // imm: 1 (000001)
+    // imm[5] (inst[12]): 0
+    // imm[4:0] (inst[6:2]): 00001
+    // inst: 100 0 10 000 00001 01 -> 0b1000100000000101 -> 0x8805
+    let inst = 0x8805;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[8], 1);
+    assert_eq!(cpu.pc, 0x2);
+
+    // 負の即値の場合 (imm = -1)
+    cpu.regs[9] = 0xAAAA_AAAA;
+    // c.andi x9, -1
+    // rd': x9 (001)
+    // imm: -1 (111111)
+    // imm[5]: 1
+    // imm[4:0]: 11111
+    // inst: 100 1 10 001 11111 01 -> 0b1001100011111101 -> 0x98FD
+    let inst = 0x98FD;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[9], 0xAAAA_AAAA);
+    assert_eq!(cpu.pc, 0x4);
+
+    // imm = -32 (最小値)
+    cpu.regs[10] = 0xFFFF_FFFF;
+    // rd': x10 (010)
+    // imm: -32 (100000)
+    // imm[5]: 1
+    // imm[4:0]: 00000
+    // inst: 100 1 10 010 00000 01 -> 0b1001100100000001 -> 0x9901
+    let inst = 0x9901;
+    bus.write_inst16(0x4, inst);
+
+    cpu.step(&mut bus);
+    // 0xFFFF_FFFF & 0xFFFF_FFE0 = 0xFFFF_FFE0
+    assert_eq!(cpu.regs[10], 0xFFFF_FFE0);
+    assert_eq!(cpu.pc, 0x6);
+}

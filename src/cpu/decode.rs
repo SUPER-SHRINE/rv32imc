@@ -199,6 +199,18 @@ impl Cpu {
         (8 + rd_prime, shamt as u32)
     }
 
+    pub(super) fn decode_cb_andi_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
+        let imm5 = (inst_bin >> 12) & 0x1;
+        let imm4_0 = (inst_bin >> 2) & 0x1f;
+        let imm = (imm5 << 5) | imm4_0;
+
+        // Sign extension from 6th bit (bit 5 of imm)
+        let imm = ((imm as i32) << 26 >> 26) as u32;
+
+        (8 + rd_prime, imm)
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }
