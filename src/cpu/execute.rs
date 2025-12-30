@@ -627,4 +627,13 @@ impl Cpu {
         self.pc = self.pc.wrapping_add(imm);
         StepResult::Jumped
     }
+
+    pub(super) fn c_li(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved for HINTs
+        }
+        self.regs[rd] = imm;
+        StepResult::Ok
+    }
 }

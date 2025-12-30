@@ -210,6 +210,7 @@ impl Cpu {
             0b01 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_addi(inst_bin),
                 0b001 => self.c_jal(inst_bin),
+                0b010 => self.c_li(inst_bin),
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),

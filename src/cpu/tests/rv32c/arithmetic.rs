@@ -107,3 +107,62 @@ fn test_c_addi() {
     assert_eq!(cpu.regs[10], 109);
     assert_eq!(cpu.pc, 0x4);
 }
+
+#[test]
+fn test_c_li() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // c.li x10, 10
+    // quadrant: 01, funct3: 010
+    // rd: x10 (01010)
+    // imm: 10 (001010)
+    // imm[5]: 0, imm[4:0]: 01010
+    // inst: 010 0 01010 01010 01 -> 0b0100010100101001 -> 0x4529
+    let inst = 0x4529;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 10);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.li x11, -1
+    // imm: -1 (111111)
+    // imm[5]: 1, imm[4:0]: 11111
+    // rd: x11 (01011)
+    // inst: 010 1 01011 11111 01 -> 0b0101010111111101 -> 0x55fd
+    let inst = 0x55fd;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[11], 0xffff_ffff);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_c_li_reserved() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // mtvec = 0x100
+    cpu.csr.mtvec = 0x100;
+
+    // c.li x0, 10
+    // quadrant: 01, funct3: 010
+    // rd: x0 (00000)
+    // imm: 10 (001010)
+    // inst: 010 0 00000 01010 01 -> 0b0100000000101001 -> 0x4029
+    let inst = 0x4029;
+    bus.write_inst16(0x0, inst);
+
+    let result = cpu.step(&mut bus);
+    
+    // Should trap with exception code 2 (Illegal Instruction)
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap"),
+    }
+    assert_eq!(cpu.pc, 0x100);
+    assert_eq!(cpu.csr.mcause, 2);
+    assert_eq!(cpu.csr.mepc, 0x0);
+}
