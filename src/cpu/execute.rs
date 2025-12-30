@@ -614,4 +614,22 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn remu(&mut self, inst_bin: u32) -> StepResult {
+        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            let val1 = self.regs[rs1];
+            let val2 = self.regs[rs2];
+
+            let result = if val2 == 0 {
+                val1
+            } else {
+                val1 % val2
+            };
+
+            self.regs[rd] = result;
+        }
+        self.pc += 4;
+        StepResult::Ok
+    }
+
 }

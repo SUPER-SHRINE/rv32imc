@@ -137,10 +137,14 @@ impl Cpu {
                     0b0000001 => self.divu(inst_bin),
                     _ => self.handle_trap(2),
                 },
-                0b111 => self.and(inst_bin),
                 0b110 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.or(inst_bin),
                     0b0000001 => self.rem(inst_bin),
+                    _ => self.handle_trap(2),
+                },
+                0b111 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.and(inst_bin),
+                    0b0000001 => self.remu(inst_bin),
                     _ => self.handle_trap(2),
                 },
                 _ => self.handle_trap(2),
