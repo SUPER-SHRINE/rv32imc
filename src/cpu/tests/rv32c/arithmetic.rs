@@ -618,3 +618,74 @@ fn test_c_and() {
     assert_eq!(cpu.regs[10], 0x1234_5678);
     assert_eq!(cpu.pc, 0x4);
 }
+
+#[test]
+fn test_c_slli() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // rd = x1 (ra), x1 に 0x0000_0001 をセット
+    cpu.regs[1] = 0x0000_0001;
+
+    // c.slli x1, 4
+    // quadrant: 10, funct3: 000
+    // rd: 1 (00001)
+    // shamt: 4 (000100)
+    // shamt[5] (inst[12]): 0
+    // shamt[4:0] (inst[6:2]): 00100
+    // inst: 000 0 00001 00100 10 -> 0b0000000010010010 -> 0x0092
+    let inst = 0x0092;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0x0000_0010);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.slli x2, 31
+    // rd: 2 (00010)
+    // shamt: 31 (11111)
+    // cpu.regs[2] = 1
+    cpu.regs[2] = 1;
+    // inst: 000 0 00010 11111 10 -> 0b0000000101111110 -> 0x017e
+    let inst = 0x017e;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 0x8000_0000);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_c_slli_hint_and_reserved() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+    cpu.csr.mtvec = 0x100;
+
+    // c.slli x1, 0 (HINT)
+    // inst: 000 0 00001 00000 10 -> 0x0082
+    cpu.regs[1] = 0x1234;
+    bus.write_inst16(0x0, 0x0082);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0x1234); // Should not change
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.slli x1, 32 (shamt[5] = 1, Reserved for RV32C)
+    // inst: 000 1 00001 00000 10 -> 0x1082
+    bus.write_inst16(0x2, 0x1082);
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap for shamt[5]=1 in RV32C"),
+    }
+    assert_eq!(cpu.pc, 0x100);
+
+    // c.slli x0, 1 (Reserved)
+    // inst: 000 0 00000 00001 10 -> 0x0006
+    cpu.pc = 0x0;
+    bus.write_inst16(0x0, 0x0006);
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap for rd=x0 in C.SLLI"),
+    }
+}

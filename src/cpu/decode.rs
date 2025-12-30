@@ -86,6 +86,14 @@ impl Cpu {
         (rd, imm)
     }
 
+    pub(super) fn decode_ci_shamt_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let shamt5 = (inst_bin >> 12) & 0x1;
+        let shamt4_0 = (inst_bin >> 2) & 0x1f;
+        let shamt = (shamt5 << 5) | shamt4_0;
+        (rd, shamt as u32)
+    }
+
     pub(super) fn decode_ciw_type(&self, inst_bin: u16) -> (usize, u32) {
         let rd_prime = ((inst_bin >> 2) & 0x7) as usize;
 

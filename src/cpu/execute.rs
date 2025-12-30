@@ -744,4 +744,21 @@ impl Cpu {
             StepResult::Ok
         }
     }
+
+    pub(super) fn c_slli(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, shamt) = self.decode_ci_shamt_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        // shamt[5] must be 0 for RV32C
+        if (inst_bin >> 12) & 0x1 != 0 {
+            return self.handle_trap(2);
+        }
+        if shamt == 0 {
+            // shamt=0 is reserved for HINTs
+            return StepResult::Ok;
+        }
+        self.regs[rd] <<= shamt;
+        StepResult::Ok
+    }
 }
