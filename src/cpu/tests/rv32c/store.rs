@@ -73,3 +73,50 @@ fn test_c_sw_various_regs() {
     assert_eq!(bus.read32(0x204), 0xAAAABBBB);
     assert_eq!(cpu.pc, 0x2);
 }
+
+#[test]
+fn test_c_swsp() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // sp (x2) = 0x100
+    cpu.regs[2] = 0x100;
+    // rs2 = x1 = 0x12345678
+    cpu.regs[1] = 0x12345678;
+
+    // c.swsp x1, 0(sp)
+    // quadrant: 10
+    // funct3: 110
+    // rs2: 00001 (x1)
+    // imm: 0 (imm[5:2]=0000, imm[7:6]=00)
+    // inst bits: 110 000000 00001 10 -> 0b1100_0000_0000_0110 = 0xc006
+    let inst = 0xc006;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(bus.read32(0x100), 0x12345678);
+    assert_eq!(cpu.pc, 0x2);
+}
+
+#[test]
+fn test_c_swsp_offset() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // sp (x2) = 0x200
+    cpu.regs[2] = 0x200;
+    // rs2 = x31 = 0x87654321
+    cpu.regs[31] = 0x87654321;
+
+    // c.swsp x31, 252(sp)
+    // imm: 252 = 0b11111100 -> imm[7:2]=111111 -> imm[7:6]=11, imm[5:2]=1111
+    // rs2: 11111 (x31)
+    // inst bits: 110 (funct3) 1111 (imm[5:2]) 11 (imm[7:6]) 11111 (rs2) 10 (op)
+    // inst bits: 110 1111 11 11111 10 -> 0b1101_1111_1111_1110 = 0xdffe
+    let inst = 0xdffe;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(bus.read32(0x200 + 252), 0x87654321);
+    assert_eq!(cpu.pc, 0x2);
+}

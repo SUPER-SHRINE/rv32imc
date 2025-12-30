@@ -266,6 +266,7 @@ impl Cpu {
                         _ => self.handle_trap(2),
                     }
                 }
+                0b110 => self.c_swsp(inst_bin, bus),
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),

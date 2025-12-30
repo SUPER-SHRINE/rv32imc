@@ -616,6 +616,13 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn c_swsp<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rs2, imm) = self.decode_c_swsp_type(inst_bin);
+        let addr = self.regs[2].wrapping_add(imm);
+        bus.write32(addr, self.regs[rs2]);
+        StepResult::Ok
+    }
+
     pub(super) fn c_jr(&mut self, inst_bin: u16) -> StepResult {
         let (rs1, rs2) = self.decode_cr_type(inst_bin);
         if rs1 == 0 || rs2 != 0 {

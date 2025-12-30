@@ -266,6 +266,21 @@ impl Cpu {
         (rd, imm as u32)
     }
 
+    pub(super) fn decode_c_swsp_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
+
+        // imm[5:2|7:6] bit structure in C.SWSP:
+        // inst[12:9] -> imm[5:2]
+        // inst[8:7] -> imm[7:6]
+
+        let i5_2 = (inst_bin >> 9) & 0xf;
+        let i7_6 = (inst_bin >> 7) & 0x3;
+
+        let imm = (i7_6 << 6) | (i5_2 << 2);
+
+        (rs2, imm as u32)
+    }
+
     pub(super) fn decode_cr_type(&self, inst_bin: u16) -> (usize, usize) {
         let rs1_rd = ((inst_bin >> 7) & 0x1f) as usize;
         let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
