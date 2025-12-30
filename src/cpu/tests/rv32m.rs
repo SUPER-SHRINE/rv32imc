@@ -56,3 +56,64 @@ fn test_mul_overflow() {
     assert_eq!(cpu.regs[3], 0xfffffffe);
     assert_eq!(cpu.pc, 0x4);
 }
+
+#[test]
+fn test_mulh() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = 0x7fffffff (max i32), x2 = 0x7fffffff
+    // 0x7fffffff * 0x7fffffff = 0x3fffffff_00000001
+    // Upper 32 bits = 0x3fffffff
+    cpu.regs[1] = 0x7fffffff;
+    cpu.regs[2] = 0x7fffffff;
+
+    // mulh x3, x1, x2 (0x022091b3)
+    // opcode: 0110011, rd: 3, funct3: 001, rs1: 1, rs2: 2, funct7: 0000001
+    let inst = 0x022091b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0x3fffffff);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_mulh_negative() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = -2 (0xfffffffe), x2 = -2 (0xfffffffe)
+    // -2 * -2 = 4 (0x00000000_00000004)
+    // Upper 32 bits = 0x00000000
+    cpu.regs[1] = 0xfffffffe;
+    cpu.regs[2] = 0xfffffffe;
+
+    // mulh x3, x1, x2 (0x022091b3)
+    let inst = 0x022091b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0x0);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_mulh_mixed() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = -1 (0xffffffff), x2 = 1 (0x00000001)
+    // -1 * 1 = -1 (0xffffffff_ffffffff)
+    // Upper 32 bits = 0xffffffff
+    cpu.regs[1] = 0xffffffff;
+    cpu.regs[2] = 0x00000001;
+
+    // mulh x3, x1, x2 (0x022091b3)
+    let inst = 0x022091b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0xffffffff);
+    assert_eq!(cpu.pc, 0x4);
+}
