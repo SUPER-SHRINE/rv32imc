@@ -93,6 +93,24 @@ impl Cpu {
         (8 + rd_prime, nzuimm as u32)
     }
 
+    pub(super) fn decode_cl_type(&self, inst_bin: u16) -> (usize, usize, u32) {
+        let rd_prime = ((inst_bin >> 2) & 0x7) as usize;
+        let rs1_prime = ((inst_bin >> 7) & 0x7) as usize;
+        
+        // imm[5:3|2|6] bit structure in C.LW:
+        // inst[12:10] -> imm[5:3]
+        // inst[6] -> imm[2]
+        // inst[5] -> imm[6]
+        
+        let i5_3 = (inst_bin >> 10) & 0x7;
+        let i2 = (inst_bin >> 6) & 0x1;
+        let i6 = (inst_bin >> 5) & 0x1;
+        
+        let imm = (i6 << 6) | (i5_3 << 3) | (i2 << 2);
+        
+        (8 + rd_prime, 8 + rs1_prime, imm as u32)
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }

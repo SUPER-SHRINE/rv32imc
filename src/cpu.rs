@@ -199,10 +199,11 @@ impl Cpu {
         }
     }
 
-    fn execute16<B: bus::Bus>(&mut self, inst_bin: u16, quadrant: u16, _bus: &mut B) -> StepResult {
+    fn execute16<B: bus::Bus>(&mut self, inst_bin: u16, quadrant: u16, bus: &mut B) -> StepResult {
         match quadrant {
             0b00 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_addi4spn(inst_bin),
+                0b010 => self.c_lw(inst_bin, bus),
                 _ => self.handle_trap(2),
             }
             _ => self.handle_trap(2),

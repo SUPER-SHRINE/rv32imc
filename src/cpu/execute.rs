@@ -596,4 +596,13 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn c_lw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rd, rs1, imm) = self.decode_cl_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        let val = bus.read32(addr);
+        if rd != 0 {
+            self.regs[rd] = val;
+        }
+        StepResult::Ok
+    }
 }
