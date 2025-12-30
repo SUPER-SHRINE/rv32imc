@@ -789,4 +789,12 @@ impl Cpu {
         self.regs[rd] <<= shamt;
         StepResult::Ok
     }
+
+    pub(super) fn c_jalr(&mut self, inst_bin: u16) -> StepResult {
+        let rs1 = ((inst_bin >> 7) & 0x1f) as usize;
+        let next_pc = self.pc + 2;
+        self.pc = self.regs[rs1] & !1;
+        self.regs[1] = next_pc;
+        StepResult::Jumped
+    }
 }

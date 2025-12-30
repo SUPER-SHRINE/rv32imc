@@ -525,3 +525,36 @@ fn test_c_jr() {
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x600);
 }
+
+#[test]
+fn test_c_jalr() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.jalr x5
+    // rs1 = 5
+    // inst bits:
+    // 15:12 = 1001 (funct4)
+    // 11:7  = 00101 (rs1 = x5)
+    // 6:2   = 00000
+    // 1:0   = 10 (quadrant 2)
+    // 0b1001_00101_00000_10 = 0x9282
+
+    let inst = 0x9282;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[5] = 0x400;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x400);
+    assert_eq!(cpu.regs[1], 0x202); // ra = PC + 2
+
+    // c.jalr x6, misaligned
+    let mut cpu = Cpu::new(0x300);
+    let inst = 0x9302; // rs1 = 6
+    bus.write_inst16(0x300, inst);
+    cpu.regs[6] = 0x501;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x500); // clears bit 0
+    assert_eq!(cpu.regs[1], 0x302);
+}

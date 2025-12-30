@@ -257,6 +257,8 @@ impl Cpu {
                             let rd = (inst_bin >> 7) & 0x1f;
                             if rd == 0 && rs2 == 0 {
                                 self.ebreak()
+                            } else if rs2 == 0 {
+                                self.c_jalr(inst_bin)
                             }
                         }
                         _ => self.handle_trap(2),
