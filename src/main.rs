@@ -53,7 +53,7 @@ fn run_test(path: &Path) -> Result<bool, String> {
         }
     }
 
-    let success = cpu.regs[10] == 0;
+    let success = cpu.regs[3] == 1;
 
     if !success {
         if let Some(filename) = path.file_name() {
