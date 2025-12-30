@@ -510,4 +510,14 @@ impl Cpu {
         self.pc += 4;
         StepResult::Ok
     }
+
+    pub(super) fn mul(&mut self, inst_bin: u32) -> StepResult {
+        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2]);
+        }
+        self.pc += 4;
+        StepResult::Ok
+    }
+
 }

@@ -108,6 +108,7 @@ impl Cpu {
                 0b000 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.add(inst_bin),
                     0b0100000 => self.sub(inst_bin),
+                    0b0000001 => self.mul(inst_bin),
                     _ => self.handle_trap(2),
                 },
                 0b001 => self.sll(inst_bin),

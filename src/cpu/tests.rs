@@ -8,6 +8,7 @@ mod imm_calc;
 mod jump;
 mod load;
 mod lui;
+mod rv32m;
 mod store;
 
 pub(super) use crate::bus::Bus;
