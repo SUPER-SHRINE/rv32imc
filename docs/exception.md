@@ -17,7 +17,7 @@
 `ECALL` や `EBREAK` などの例外（トラップ）が発生した際、プロセッサ（エミュレータ）は以下の処理をアトミックに実行します。
 
 1.  **`mepc` の更新**:
-    - 例外が発生した命令の PC（`ECALL` 自身のアドレス）を `mepc` CSR に保存します。
+    - 例外が発生した命令の PC を `mepc` CSR に保存します。
 2.  **`mcause` の更新**:
     - 発生した例外に対応する例外コード（例: Mモードからの `ECALL` なら 11）を `mcause` CSR に書き込みます。
 3.  **`mstatus` の更新**:
@@ -46,8 +46,8 @@
 ```rust
 impl Cpu {
     pub(super) fn handle_trap(&mut self, exception_code: u32) -> StepResult {
-        // 1. mepc に現在の PC を保存(復帰時に再度 ECALL が呼ばれないように PC に +4 しておく)
-        self.csr.mepc = self.pc + 4;
+        // 1. mepc に現在の PC を保存
+        self.csr.mepc = self.pc;
 
         // 2. mcause に例外コードを設定
         self.csr.mcause = exception_code;
