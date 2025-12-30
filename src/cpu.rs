@@ -221,6 +221,7 @@ impl Cpu {
                 }
                 0b100 => match self.decode_c_funct2(inst_bin) {
                     0b00 => self.c_srli(inst_bin),
+                    0b01 => self.c_srai(inst_bin),
                     _ => self.handle_trap(2),
                 }
                 _ => self.handle_trap(2),
