@@ -227,6 +227,7 @@ impl Cpu {
                         0b100011 => match (inst_bin >> 5) & 0x3 {
                             0b00 => self.c_sub(inst_bin),
                             0b01 => self.c_xor(inst_bin),
+                            0b10 => self.c_or(inst_bin),
                             _ => self.handle_trap(2),
                         },
                         _ => self.handle_trap(2),
