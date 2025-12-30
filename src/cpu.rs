@@ -228,6 +228,7 @@ impl Cpu {
                             0b00 => self.c_sub(inst_bin),
                             0b01 => self.c_xor(inst_bin),
                             0b10 => self.c_or(inst_bin),
+                            0b11 => self.c_and(inst_bin),
                             _ => self.handle_trap(2),
                         },
                         _ => self.handle_trap(2),

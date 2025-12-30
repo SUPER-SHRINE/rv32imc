@@ -583,3 +583,38 @@ fn test_c_or() {
     assert_eq!(cpu.regs[10], 0x1234_5678);
     assert_eq!(cpu.pc, 0x4);
 }
+
+#[test]
+fn test_c_and() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x8 (s0) = 0b1010, x9 (s1) = 0b1100
+    cpu.regs[8] = 0b1010;
+    cpu.regs[9] = 0b1100;
+
+    // c.and x8, x9
+    // quadrant: 01, funct6: 100011, funct2: 11
+    // rd': x8 (000), rs2': x9 (001)
+    // inst: 100011 000 11 001 01 -> 0b1000110001100101 -> 0x8c65
+    let inst = 0x8c65;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[8], 0b1000);
+    assert_eq!(cpu.pc, 0x2);
+
+    // x10 (a0) = 0xFFFF_FFFF, x11 (a1) = 0x1234_5678
+    cpu.regs[10] = 0xFFFF_FFFF;
+    cpu.regs[11] = 0x1234_5678;
+
+    // c.and x10, x11
+    // rd': x10 (010), rs2': x11 (011)
+    // inst: 100011 010 11 011 01 -> 0b1000110101101101 -> 0x8d6d
+    let inst = 0x8d6d;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0x1234_5678);
+    assert_eq!(cpu.pc, 0x4);
+}
