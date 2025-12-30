@@ -734,4 +734,14 @@ impl Cpu {
             StepResult::Ok
         }
     }
+
+    pub(super) fn c_bnez(&mut self, inst_bin: u16) -> StepResult {
+        let (rs1, imm) = self.decode_cb_branch_type(inst_bin);
+        if self.regs[rs1] != 0 {
+            self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
+        } else {
+            StepResult::Ok
+        }
+    }
 }

@@ -441,3 +441,53 @@ fn test_c_beqz_negative() {
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 - 10);
 }
+
+#[test]
+fn test_c_bnez_taken() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.bnez x8, 10
+    // c.beqz x8, 10 was 0xc409 (funct3 = 110)
+    // c.bnez x8, 10 has funct3 = 111
+    // 0b111_0_01_000_00_01_0_01 = 0xe409
+
+    let inst = 0xe409;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 1;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 + 10);
+}
+
+#[test]
+fn test_c_bnez_not_taken() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.bnez x8, 10 (0xe409)
+    let inst = 0xe409;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 0;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x202);
+}
+
+#[test]
+fn test_c_bnez_negative() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.bnez x8, -10
+    // c.beqz x8, -10 was 0xd87d (funct3 = 110)
+    // c.bnez x8, -10 has funct3 = 111
+    // 0b111_1_10_000_11_11_1_01 = 0xf87d
+
+    let inst = 0xf87d;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 1;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 - 10);
+}
