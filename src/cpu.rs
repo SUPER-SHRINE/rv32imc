@@ -223,6 +223,13 @@ impl Cpu {
                     0b00 => self.c_srli(inst_bin),
                     0b01 => self.c_srai(inst_bin),
                     0b10 => self.c_andi(inst_bin),
+                    0b11 => match self.decode_c_funct6(inst_bin) {
+                        0b100011 => match (inst_bin >> 5) & 0x3 {
+                            0b00 => self.c_sub(inst_bin),
+                            _ => self.handle_trap(2),
+                        },
+                        _ => self.handle_trap(2),
+                    }
                     _ => self.handle_trap(2),
                 }
                 _ => self.handle_trap(2),

@@ -477,3 +477,39 @@ fn test_c_andi() {
     assert_eq!(cpu.regs[10], 0xFFFF_FFE0);
     assert_eq!(cpu.pc, 0x6);
 }
+
+#[test]
+fn test_c_sub() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x8 (s0) = 100, x9 (s1) = 30
+    cpu.regs[8] = 100;
+    cpu.regs[9] = 30;
+
+    // c.sub x8, x9
+    // quadrant: 01, funct6: 100011, funct2: 00
+    // rd': x8 (000), rs2': x9 (001)
+    // inst: 100011 000 00 001 01 -> 0b1000110000000101 -> 0x8c05
+    let inst = 0x8c05;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[8], 70);
+    assert_eq!(cpu.pc, 0x2);
+
+    // 負の結果になる場合
+    // x10 (a0) = 10, x11 (a1) = 20
+    cpu.regs[10] = 10;
+    cpu.regs[11] = 20;
+
+    // c.sub x10, x11
+    // rd': x10 (010), rs2': x11 (011)
+    // inst: 100011 010 00 011 01 -> 0b1000110100001101 -> 0x8d0d
+    let inst = 0x8d0d;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0xffff_fff6); // -10
+    assert_eq!(cpu.pc, 0x4);
+}

@@ -211,6 +211,12 @@ impl Cpu {
         (8 + rd_prime, imm)
     }
 
+    pub(super) fn decode_ca_type(&self, inst_bin: u16) -> (usize, usize) {
+        let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
+        let rs2_prime = ((inst_bin >> 2) & 0x7) as usize;
+        (8 + rd_prime, 8 + rs2_prime)
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }
@@ -233,5 +239,9 @@ impl Cpu {
     
     pub(super) fn decode_c_funct3(&self, inst_bin: u16) -> u16 {
         (inst_bin >> 13) & 0x7
+    }
+
+    pub(super) fn decode_c_funct6(&self, inst_bin: u16) -> u16 {
+        (inst_bin >> 10) & 0x3f
     }
 }
