@@ -605,4 +605,11 @@ impl Cpu {
         }
         StepResult::Ok
     }
+
+    pub(super) fn c_sw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rs1, rs2, imm) = self.decode_cs_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        bus.write32(addr, self.regs[rs2]);
+        StepResult::Ok
+    }
 }
