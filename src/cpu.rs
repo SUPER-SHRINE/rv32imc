@@ -11,9 +11,11 @@ use super::bus;
 use csr::Csr;
 use privilege_mode::PrivilegeMode;
 
+#[derive(Debug)]
 pub enum StepResult {
     Ok,
     Trap(u32),
+    Jumped,
 }
 
 /// CPU の内部状態
@@ -43,8 +45,24 @@ impl Cpu {
 
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
-        let inst_bin = self.fetch(bus);
-        self.execute(inst_bin, bus)
+        let (inst_bin, quadrant) = self.fetch(bus);
+        if quadrant == 0b11 {
+            // 末尾が 0b11 なら 32bit 命令.
+            let result  = self.execute32(inst_bin, bus);
+            match result {
+                StepResult::Ok => self.pc += 4,
+                _ => (),
+            }
+            result
+        } else {
+            // 末尾が 0b11 以外なら 16bit 命令.
+            let result = self.execute16(inst_bin as u16, quadrant, bus);
+            match result {
+                StepResult::Ok => self.pc += 2,
+                _ => (),
+            }
+            result
+        }
     }
 
     /// レジスタの状態をダンプ
@@ -55,13 +73,22 @@ impl Cpu {
         println!("pc : 0x{:08x}", self.pc);
     }
 
-    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> u32 {
-        bus.read32(self.pc)
+    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> (u32, u16) {
+        let inst_low = bus.read16(self.pc);
+        let quadrant = self.decode_quadrant(inst_low);
+        if quadrant == 0b11 {
+            // 32-bit instruction
+            let inst_high = bus.read16(self.pc + 2);
+            let inst_bin = ((inst_high as u32) << 16) | inst_low as u32;
+            (inst_bin, quadrant)
+        } else {
+            // 16-bit instruction
+            (inst_low as u32, quadrant)
+        }
     }
 
-    fn execute<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let opcode = inst_bin & 0x7f;
-        match opcode {
+    fn execute32<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
+        match self.decode_opcode(inst_bin) {
             0b0110111 => self.lui(inst_bin),
             0b0010111 => self.auipc(inst_bin),
             0b1101111 => self.jal(inst_bin),
@@ -167,6 +194,80 @@ impl Cpu {
                 0b101 => self.csrrwi(inst_bin),
                 0b110 => self.csrrsi(inst_bin),
                 0b111 => self.csrrci(inst_bin),
+                _ => self.handle_trap(2),
+            },
+            _ => self.handle_trap(2),
+        }
+    }
+
+    fn execute16<B: bus::Bus>(&mut self, inst_bin: u16, quadrant: u16, bus: &mut B) -> StepResult {
+        match quadrant {
+            0b00 => match self.decode_c_funct3(inst_bin) {
+                0b000 => self.c_addi4spn(inst_bin),
+                0b010 => self.c_lw(inst_bin, bus),
+                0b110 => self.c_sw(inst_bin, bus),
+                _ => self.handle_trap(2),
+            },
+            0b01 => match self.decode_c_funct3(inst_bin) {
+                0b000 => self.c_addi(inst_bin),
+                0b001 => self.c_jal(inst_bin),
+                0b010 => self.c_li(inst_bin),
+                0b011 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    if rd == 2 {
+                        self.c_addi16sp(inst_bin)
+                    } else {
+                        self.c_lui(inst_bin)
+                    }
+                }
+                0b100 => match self.decode_c_funct2(inst_bin) {
+                    0b00 => self.c_srli(inst_bin),
+                    0b01 => self.c_srai(inst_bin),
+                    0b10 => self.c_andi(inst_bin),
+                    0b11 => match self.decode_c_funct6(inst_bin) {
+                        0b100011 => match (inst_bin >> 5) & 0x3 {
+                            0b00 => self.c_sub(inst_bin),
+                            0b01 => self.c_xor(inst_bin),
+                            0b10 => self.c_or(inst_bin),
+                            0b11 => self.c_and(inst_bin),
+                            _ => self.handle_trap(2),
+                        },
+                        _ => self.handle_trap(2),
+                    }
+                    _ => self.handle_trap(2),
+                }
+                0b101 => self.c_j(inst_bin),
+                0b110 => self.c_beqz(inst_bin),
+                0b111 => self.c_bnez(inst_bin),
+                _ => self.handle_trap(2),
+            },
+            0b10 => match self.decode_c_funct3(inst_bin) {
+                0b000 => self.c_slli(inst_bin),
+                0b010 => self.c_lwsp(inst_bin, bus),
+                0b100 => {
+                    let rs2 = (inst_bin >> 2) & 0x1f;
+                    match self.decode_c_funct4(inst_bin) {
+                        0b1000 => {
+                            if rs2 == 0 {
+                                self.c_jr(inst_bin)
+                            } else {
+                                self.c_mv(inst_bin)
+                            }
+                        }
+                        0b1001 => {
+                            let rd = (inst_bin >> 7) & 0x1f;
+                            if rd == 0 && rs2 == 0 {
+                                self.ebreak()
+                            } else if rs2 == 0 {
+                                self.c_jalr(inst_bin)
+                            } else {
+                                self.c_add(inst_bin)
+                            }
+                        }
+                        _ => self.handle_trap(2),
+                    }
+                }
+                0b110 => self.c_swsp(inst_bin, bus),
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),

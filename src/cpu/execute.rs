@@ -7,7 +7,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = imm;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -16,7 +15,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.pc.wrapping_add(imm);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -26,7 +24,7 @@ impl Cpu {
             self.regs[rd] = self.pc.wrapping_add(4);
         }
         self.pc = self.pc.wrapping_add(imm);
-        StepResult::Ok
+        StepResult::Jumped
     }
 
     pub(super) fn jalr(&mut self, inst_bin: u32) -> StepResult {
@@ -37,67 +35,67 @@ impl Cpu {
             self.regs[rd] = t;
         }
         self.pc = target;
-        StepResult::Ok
+        StepResult::Jumped
     }
 
     pub(super) fn beq(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] == self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn bne(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] != self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn blt(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn bge(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if (self.regs[rs1] as i32) >= (self.regs[rs2] as i32) {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn bltu(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] < self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn bgeu(&mut self, inst_bin: u32) -> StepResult {
         let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
         if self.regs[rs1] >= self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
         } else {
-            self.pc = self.pc.wrapping_add(4);
+            StepResult::Ok
         }
-        StepResult::Ok
     }
 
     pub(super) fn lb<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
@@ -107,7 +105,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -118,7 +115,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -129,7 +125,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -140,7 +135,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -151,7 +145,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = val;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -160,7 +153,6 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xff) as u8;
         bus.write8(addr, val);
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -169,7 +161,6 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xffff) as u16;
         bus.write16(addr, val);
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -178,7 +169,6 @@ impl Cpu {
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = self.regs[rs2];
         bus.write32(addr, val);
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -187,7 +177,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_add(imm);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -200,7 +189,6 @@ impl Cpu {
                 0
             };
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -209,7 +197,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = if self.regs[rs1] < imm { 1 } else { 0 };
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -218,7 +205,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] ^ imm;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -227,7 +213,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] | imm;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -236,7 +221,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] & imm;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -246,7 +230,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -256,7 +239,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] >> shamt;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -266,7 +248,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -275,7 +256,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -284,7 +264,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -294,7 +273,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] << shamt;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -307,7 +285,6 @@ impl Cpu {
                 0
             };
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -316,7 +293,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = if self.regs[rs1] < self.regs[rs2] { 1 } else { 0 };
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -325,7 +301,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -335,7 +310,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] >> shamt;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -345,7 +319,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -354,7 +327,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] | self.regs[rs2];
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -363,17 +335,14 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] & self.regs[rs2];
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
     pub(super) fn fence(&mut self) -> StepResult {
-        self.pc += 4;
         StepResult::Ok
     }
 
     pub(super) fn fence_i(&mut self) -> StepResult {
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -409,7 +378,7 @@ impl Cpu {
         };
         // MPP is set to the least-privileged mode supported (User=0)
         self.csr.mstatus &= !(0b11 << 11);
-        StepResult::Ok
+        StepResult::Jumped
     }
 
     pub(super) fn csrrw(&mut self, inst_bin: u32) -> StepResult {
@@ -424,7 +393,6 @@ impl Cpu {
             self.regs[rd as usize] = old_val;
         }
         self.csr.write(csr_addr, new_val);
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -442,7 +410,6 @@ impl Cpu {
         if rs1 != 0 {
             self.csr.write(csr_addr, old_val | set_mask);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -460,7 +427,6 @@ impl Cpu {
         if rs1 != 0 {
             self.csr.write(csr_addr, old_val & !clear_mask);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -475,7 +441,6 @@ impl Cpu {
             self.regs[rd as usize] = old_val;
         }
         self.csr.write(csr_addr, uimm);
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -491,7 +456,6 @@ impl Cpu {
         if uimm != 0 {
             self.csr.write(csr_addr, old_val | uimm);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -507,7 +471,6 @@ impl Cpu {
         if uimm != 0 {
             self.csr.write(csr_addr, old_val & !uimm);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -516,7 +479,6 @@ impl Cpu {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2]);
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -528,7 +490,6 @@ impl Cpu {
             let result = src1 * src2;
             self.regs[rd] = (result >> 32) as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -540,7 +501,6 @@ impl Cpu {
             let result = src1 * src2;
             self.regs[rd] = (result >> 32) as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -552,7 +512,6 @@ impl Cpu {
             let result = src1 * src2;
             self.regs[rd] = (result >> 32) as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -572,7 +531,6 @@ impl Cpu {
 
             self.regs[rd] = result as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -590,7 +548,6 @@ impl Cpu {
 
             self.regs[rd] = result;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -610,7 +567,6 @@ impl Cpu {
 
             self.regs[rd] = result as u32;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
@@ -628,8 +584,231 @@ impl Cpu {
 
             self.regs[rd] = result;
         }
-        self.pc += 4;
         StepResult::Ok
     }
 
+    pub(super) fn c_addi4spn(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ciw_type(inst_bin);
+        if imm == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        self.regs[rd] = self.regs[2].wrapping_add(imm);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_lw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rd, rs1, imm) = self.decode_cl_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        let val = bus.read32(addr);
+        if rd != 0 {
+            self.regs[rd] = val;
+        }
+        StepResult::Ok
+    }
+
+    pub(super) fn c_lwsp<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rd, imm) = self.decode_c_lwsp_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        let addr = self.regs[2].wrapping_add(imm);
+        self.regs[rd] = bus.read32(addr);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_swsp<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rs2, imm) = self.decode_c_swsp_type(inst_bin);
+        let addr = self.regs[2].wrapping_add(imm);
+        bus.write32(addr, self.regs[rs2]);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_jr(&mut self, inst_bin: u16) -> StepResult {
+        let (rs1, rs2) = self.decode_cr_type(inst_bin);
+        if rs1 == 0 || rs2 != 0 {
+            return self.handle_trap(2); // C.JR: rs1 != 0, rs2 == 0
+        }
+        self.pc = self.regs[rs1] & !1;
+        StepResult::Jumped
+    }
+
+    pub(super) fn c_mv(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_cr_type(inst_bin);
+        if rd == 0 || rs2 == 0 {
+            return self.handle_trap(2); // C.MV: rd != 0, rs2 != 0
+        }
+        self.regs[rd] = self.regs[rs2];
+        StepResult::Ok
+    }
+
+    pub(super) fn c_sw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
+        let (rs1, rs2, imm) = self.decode_cs_type(inst_bin);
+        let addr = self.regs[rs1].wrapping_add(imm);
+        bus.write32(addr, self.regs[rs2]);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_addi(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rd].wrapping_add(imm);
+        }
+        StepResult::Ok
+    }
+
+    pub(super) fn c_jal(&mut self, inst_bin: u16) -> StepResult {
+        let imm = self.decode_cj_type(inst_bin);
+        self.regs[1] = self.pc.wrapping_add(2);
+        self.pc = self.pc.wrapping_add(imm);
+        StepResult::Jumped
+    }
+
+    pub(super) fn c_li(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved for HINTs
+        }
+        self.regs[rd] = imm;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_addi16sp(&mut self, inst_bin: u16) -> StepResult {
+        let imm = self.decode_c_addi16sp_imm(inst_bin);
+        if imm == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        self.regs[2] = self.regs[2].wrapping_add(imm);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_lui(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd == 0 || rd == 2 {
+            return self.handle_trap(2); // rd=0 is reserved, rd=2 is C.ADDI16SP
+        }
+        // C.LUI loads the 6-bit immediate into bits [17:12], then sign-extends.
+        // But wait, the spec says "loads the non-zero 6-bit immediate into bits 17-12, then sign-extends".
+        // Our decode_ci_type returns a sign-extended 32-bit value from bits [12|6:2] of inst.
+        // For C.LUI, the 6 bits are imm[17:12].
+        
+        let imm_u32 = imm << 12;
+        self.regs[rd] = imm_u32;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_srli(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
+        // shamt[5] must be 0 for RV32C
+        if (inst_bin >> 12) & 0x1 != 0 {
+            return self.handle_trap(2);
+        }
+        if shamt == 0 {
+            // shamt=0 is reserved for HINTs
+            return StepResult::Ok;
+        }
+        self.regs[rd] >>= shamt;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_srai(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
+        // shamt[5] must be 0 for RV32C
+        if (inst_bin >> 12) & 0x1 != 0 {
+            return self.handle_trap(2);
+        }
+        if shamt == 0 {
+            // shamt=0 is reserved for HINTs
+            return StepResult::Ok;
+        }
+        self.regs[rd] = ((self.regs[rd] as i32) >> shamt) as u32;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_andi(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_cb_andi_type(inst_bin);
+        self.regs[rd] &= imm;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_sub(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_ca_type(inst_bin);
+        self.regs[rd] = self.regs[rd].wrapping_sub(self.regs[rs2]);
+        StepResult::Ok
+    }
+
+    pub(super) fn c_xor(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_ca_type(inst_bin);
+        self.regs[rd] ^= self.regs[rs2];
+        StepResult::Ok
+    }
+
+    pub(super) fn c_or(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_ca_type(inst_bin);
+        self.regs[rd] |= self.regs[rs2];
+        StepResult::Ok
+    }
+
+    pub(super) fn c_and(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_ca_type(inst_bin);
+        self.regs[rd] &= self.regs[rs2];
+        StepResult::Ok
+    }
+
+    pub(super) fn c_j(&mut self, inst_bin: u16) -> StepResult {
+        let imm = self.decode_cj_type(inst_bin);
+        self.pc = self.pc.wrapping_add(imm);
+        StepResult::Jumped
+    }
+
+    pub(super) fn c_beqz(&mut self, inst_bin: u16) -> StepResult {
+        let (rs1, imm) = self.decode_cb_branch_type(inst_bin);
+        if self.regs[rs1] == 0 {
+            self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
+        } else {
+            StepResult::Ok
+        }
+    }
+
+    pub(super) fn c_bnez(&mut self, inst_bin: u16) -> StepResult {
+        let (rs1, imm) = self.decode_cb_branch_type(inst_bin);
+        if self.regs[rs1] != 0 {
+            self.pc = self.pc.wrapping_add(imm);
+            StepResult::Jumped
+        } else {
+            StepResult::Ok
+        }
+    }
+
+    pub(super) fn c_slli(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, shamt) = self.decode_ci_shamt_type(inst_bin);
+        if rd == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        // shamt[5] must be 0 for RV32C
+        if (inst_bin >> 12) & 0x1 != 0 {
+            return self.handle_trap(2);
+        }
+        if shamt == 0 {
+            // shamt=0 is reserved for HINTs
+            return StepResult::Ok;
+        }
+        self.regs[rd] <<= shamt;
+        StepResult::Ok
+    }
+
+    pub(super) fn c_jalr(&mut self, inst_bin: u16) -> StepResult {
+        let rs1 = ((inst_bin >> 7) & 0x1f) as usize;
+        let next_pc = self.pc + 2;
+        self.pc = self.regs[rs1] & !1;
+        self.regs[1] = next_pc;
+        StepResult::Jumped
+    }
+
+    pub(super) fn c_add(&mut self, inst_bin: u16) -> StepResult {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
+        self.regs[rd] = self.regs[rd].wrapping_add(self.regs[rs2]);
+        StepResult::Ok
+    }
 }
