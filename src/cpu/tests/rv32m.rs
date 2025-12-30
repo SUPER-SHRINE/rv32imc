@@ -306,3 +306,54 @@ fn test_divu_by_zero() {
     assert_eq!(cpu.regs[3], 0xffffffff); // 2^32 - 1
 }
 
+#[test]
+fn test_rem() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = 20, x2 = 3
+    cpu.regs[1] = 20;
+    cpu.regs[2] = 3;
+
+    // rem x3, x1, x2 (0x0220e1b3)
+    // opcode: 0110011, rd: 3, funct3: 110, rs1: 1, rs2: 2, funct7: 0000001
+    let inst = 0x0220e1b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 2);
+}
+
+#[test]
+fn test_rem_negative() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x1 = -20 (0xffffffec), x2 = 3
+    cpu.regs[1] = 0xffffffec;
+    cpu.regs[2] = 3;
+
+    // rem x3, x1, x2
+    let inst = 0x0220e1b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 0xfffffffe); // -2
+}
+
+#[test]
+fn test_rem_by_zero() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    cpu.regs[1] = 20;
+    cpu.regs[2] = 0;
+
+    // rem x3, x1, x2
+    let inst = 0x0220e1b3;
+    bus.write_inst32(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[3], 20); // dividend
+}
+

@@ -594,4 +594,24 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn rem(&mut self, inst_bin: u32) -> StepResult {
+        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+        if rd != 0 {
+            let val1 = self.regs[rs1] as i32;
+            let val2 = self.regs[rs2] as i32;
+
+            let result = if val2 == 0 {
+                val1
+            } else if val1 == i32::MIN && val2 == -1 {
+                0
+            } else {
+                val1 % val2
+            };
+
+            self.regs[rd] = result as u32;
+        }
+        self.pc += 4;
+        StepResult::Ok
+    }
+
 }
