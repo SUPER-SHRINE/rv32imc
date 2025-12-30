@@ -126,7 +126,11 @@ impl Cpu {
                     0b0000001 => self.mulhu(inst_bin),
                     _ => self.handle_trap(2),
                 },
-                0b100 => self.xor(inst_bin),
+                0b100 => match self.decode_funct7(inst_bin) {
+                    0b0000000 => self.xor(inst_bin),
+                    0b0000001 => self.div(inst_bin),
+                    _ => self.handle_trap(2),
+                },
                 0b101 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.srl(inst_bin),
                     0b0100000 => self.sra(inst_bin),
