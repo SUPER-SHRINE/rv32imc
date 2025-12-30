@@ -612,4 +612,12 @@ impl Cpu {
         bus.write32(addr, self.regs[rs2]);
         StepResult::Ok
     }
+
+    pub(super) fn c_addi(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd != 0 {
+            self.regs[rd] = self.regs[rd].wrapping_add(imm);
+        }
+        StepResult::Ok
+    }
 }

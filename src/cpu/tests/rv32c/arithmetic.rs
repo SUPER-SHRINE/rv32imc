@@ -67,3 +67,43 @@ fn test_c_addi4spn_various_imm() {
     assert_eq!(cpu.regs[10], 404);
     assert_eq!(cpu.pc, 0x2);
 }
+
+#[test]
+fn test_c_addi() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // x10 = 100
+    cpu.regs[10] = 100;
+
+    // c.addi x10, 10
+    // quadrant: 01, funct3: 000
+    // rd: x10 (01010)
+    // imm: 10 (001010)
+    // imm[5]: 0, imm[4:0]: 01010
+    // inst: 000 0 01010 01010 01 -> 0x0529
+    let inst = 0x0529;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 110);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.addi x10, -1
+    // imm: -1 (111111)
+    // imm[5]: 1 (bit 12), imm[4:0]: 11111 (bits 6:2)
+    // inst: 000 1 11111 01010 01 -> 0b000 1 01010 11111 01
+    // rd: 10 (01010)
+    // ビット 15:13 = 000
+    // ビット 12 = 1 (imm[5])
+    // ビット 11:7 = 01010 (rd)
+    // ビット 6:2 = 11111 (imm[4:0])
+    // ビット 1:0 = 01
+    // 000 1 01010 11111 01 -> 0b0001010101111101 -> 0x157d
+    let inst = 0x157d;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 109);
+    assert_eq!(cpu.pc, 0x4);
+}

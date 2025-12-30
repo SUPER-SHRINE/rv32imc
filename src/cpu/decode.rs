@@ -74,6 +74,18 @@ impl Cpu {
         (rd, rs1, rs2)
     }
 
+    pub(super) fn decode_ci_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let imm5 = (inst_bin >> 12) & 0x1;
+        let imm4_0 = (inst_bin >> 2) & 0x1f;
+        let imm = (imm5 << 5) | imm4_0;
+
+        // Sign extension from 6th bit (bit 5 of imm)
+        let imm = ((imm as i32) << 26 >> 26) as u32;
+
+        (rd, imm)
+    }
+
     pub(super) fn decode_ciw_type(&self, inst_bin: u16) -> (usize, u32) {
         let rd_prime = ((inst_bin >> 2) & 0x7) as usize;
 
