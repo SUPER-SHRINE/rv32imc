@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 use crate::cpu::privilege_mode::PrivilegeMode;
-use crate::cpu::tests::MockBus;
+use crate::cpu::tests::mock_bus::MockBus;
 
 #[test]
 fn test_ecall_user() {

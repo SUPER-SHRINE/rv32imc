@@ -1,5 +1,5 @@
 use crate::cpu::Cpu;
-use super::MockBus;
+use crate::cpu::tests::mock_bus::MockBus;
 
 #[test]
 fn test_addi() {

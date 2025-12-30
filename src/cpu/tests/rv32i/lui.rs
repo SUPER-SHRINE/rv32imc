@@ -1,5 +1,5 @@
 use crate::cpu::Cpu;
-use super::MockBus;
+use crate::cpu::tests::mock_bus::MockBus;
 
 // lui 命令によってレジスタの値が正しく設定され、PC が +4 進むことを確認
 #[test]
