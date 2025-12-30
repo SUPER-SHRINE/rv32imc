@@ -217,6 +217,30 @@ impl Cpu {
         (8 + rd_prime, 8 + rs2_prime)
     }
 
+    pub(super) fn decode_cb_branch_type(&self, inst_bin: u16) -> (usize, u32) {
+        let rs1_prime = ((inst_bin >> 7) & 0x7) as usize;
+
+        // imm[8|4:3|7:6|2:1|5] bit structure in C.BEQZ/C.BNEZ:
+        // inst[12] -> imm[8]
+        // inst[11:10] -> imm[4:3]
+        // inst[6:5] -> imm[7:6]
+        // inst[4:3] -> imm[2:1]
+        // inst[2] -> imm[5]
+
+        let i8 = (inst_bin >> 12) & 0x1;
+        let i7_6 = (inst_bin >> 5) & 0x3;
+        let i5 = (inst_bin >> 2) & 0x1;
+        let i4_3 = (inst_bin >> 10) & 0x3;
+        let i2_1 = (inst_bin >> 3) & 0x3;
+
+        let imm = (i8 << 8) | (i7_6 << 6) | (i5 << 5) | (i4_3 << 3) | (i2_1 << 1);
+
+        // Sign extension from 9th bit (bit 8 of imm)
+        let imm = ((imm as i32) << 23 >> 23) as u32;
+
+        (8 + rs1_prime, imm)
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }

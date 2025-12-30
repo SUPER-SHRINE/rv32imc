@@ -285,3 +285,159 @@ fn test_c_j_negative() {
     assert_eq!(cpu.pc, 0x200 - 100);
     assert_eq!(cpu.regs[1], 0); // x1 should not be changed
 }
+
+#[test]
+fn test_c_beqz_taken() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.beqz x8, 10
+    // x8 (s0) is index 8 in cpu.regs.
+    // Initial x8 is 0.
+    // PC = 0x200
+    // imm = 10 (0b0000_0101_0) -> imm[8:1] = 0000_0101
+    // Bit structure: imm[8|4:3|7:6|2:1|5]
+    // imm[8] = 0
+    // imm[7:6] = 00
+    // imm[5] = 0
+    // imm[4:3] = 01
+    // imm[2:1] = 01
+
+    // inst bits:
+    // 15:13 = 110 (funct3)
+    // 12    = 0 (imm[8])
+    // 11:10 = 11 (reserved for C.BEQZ/C.BNEZ)
+    // 9:7   = 000 (rs1' = x8)
+    // 6:5   = 00 (imm[7:6])
+    // 4:3   = 01 (imm[4:3])
+    // 2     = 0 (imm[5])
+    // 1     = 01 (quadrant) -> Wait, 2:0 is imm[2:1] and then quadrant 01?
+    // Let's check format again:
+    // | 15 13 | 12 | 11 10 | 9 7 | 6 5 | 4 3 | 2 | 1 0 |
+    // | 110   |i[8]| 11    |rs1' |i[7:6]|i[4:3]|i[5]| 01  |
+    // Wait, the doc said: | 110 | imm[8] | 11 | rs1' | imm[4:3|7:6|2:1|5] | 01 |
+    // Re-checking rv32c.md:
+    // | 110 | imm[8] | 11 | rs1' | imm[4:3|7:6|2:1|5] | 01 |
+    // Bits 6-2: imm[4:3|7:6|2:1|5] is NOT 5 bits total.
+    // Ah, imm[4:3] is 2 bits, imm[7:6] is 2 bits, imm[2:1] is 2 bits? No.
+    // Total bits for imm: 8, 7, 6, 5, 4, 3, 2, 1 (8 bits) + bit 0 is always 0.
+    // Instruction bits 6-2 (5 bits) are:
+    // 6:5 -> imm[7:6]
+    // 4:3 -> imm[2:1]
+    // 2   -> imm[5]
+    // Wait, let's look at the standard:
+    // C.BEQZ: funct3=110, imm[8|4:3|7:6|2:1|5], rs1'
+    // inst[12] = imm[8]
+    // inst[11:10] = 11
+    // inst[9:7] = rs1'
+    // inst[6:5] = imm[7:6]
+    // inst[4:3] = imm[4:3] -- Wait, I see different versions. Let me check the official spec.
+    // RISC-V Compressed Spec:
+    // C.BEQZ (CB-type): imm[8|4:3|7:6|2:1|5]
+    // inst[12] -> imm[8]
+    // inst[11:10] -> 11
+    // inst[9:7] -> rs1'
+    // inst[6:5] -> imm[7:6]
+    // inst[4:3] -> imm[2:1]
+    // inst[2] -> imm[5]
+    // wait, that's only 5 bits for 6:2.
+    // inst[6:5] (2 bits)
+    // inst[4:3] (2 bits)
+    // inst[2] (1 bit)
+    // Total 5 bits.
+    // imm bits: 8 (1), 7:6 (2), 5 (1), 4:3 (2), 2:1 (2). Total 8 bits (+ 1 implied).
+    // Let's re-verify:
+    // inst[12]   -> imm[8]
+    // inst[11:10] -> 11
+    // inst[9:7]   -> rs1'
+    // inst[6:5]   -> imm[7:6]
+    // inst[4:3]   -> imm[2:1]
+    // inst[2]     -> imm[5]
+    // Wait, where are imm[4:3]?
+    // Let me check again.
+    // RV32 Compressed Instruction Formats:
+    // CB Format: | funct3 | offset[8|4:3] | rs1' | offset[7:6|2:1|5] | op |
+    // funct3 (15:13)
+    // offset[8] (12)
+    // offset[4:3] (11:10)
+    // rs1' (9:7)
+    // offset[7:6] (6:5)
+    // offset[2:1] (4:3)
+    // offset[5] (2)
+    // op (1:0)
+    
+    // So for imm = 10 (0b0_0000_1010):
+    // imm[8] = 0
+    // imm[7:6] = 00
+    // imm[5] = 0
+    // imm[4:3] = 01
+    // imm[2:1] = 01
+    
+    // inst bits:
+    // 15:13 = 110
+    // 12    = 0 (imm[8])
+    // 11:10 = 01 (imm[4:3])
+    // 9:7   = 000 (rs1' = x8)
+    // 6:5   = 00 (imm[7:6])
+    // 4:3   = 01 (imm[2:1])
+    // 2     = 0 (imm[5])
+    // 1:0   = 01
+    
+    // 0b110_0_01_000_00_01_0_01 = 0xc409
+    
+    let inst = 0xc409;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 0;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 + 10);
+}
+
+#[test]
+fn test_c_beqz_not_taken() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.beqz x8, 10 (0xc409)
+    let inst = 0xc409;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 1;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x202);
+}
+
+#[test]
+fn test_c_beqz_negative() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.beqz x8, -10
+    // imm = -10 (9 bits)
+    // 10 = 0b0_0000_1010
+    // -10 = 0b1_1111_0110 (9 bits)
+    // imm[8] = 1
+    // imm[7:6] = 11
+    // imm[5] = 1
+    // imm[4:3] = 10
+    // imm[2:1] = 11
+    
+    // inst bits:
+    // 15:13 = 110
+    // 12    = 1 (imm[8])
+    // 11:10 = 10 (imm[4:3])
+    // 9:7   = 000 (rs1' = x8)
+    // 6:5   = 11 (imm[7:6])
+    // 4:3   = 11 (imm[2:1])
+    // 2     = 1 (imm[5])
+    // 1:0   = 01
+    
+    // 0b110_1_10_000_11_11_1_01 = 0xd87d
+    
+    let inst = 0xd87d;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[8] = 0;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x200 - 10);
+}

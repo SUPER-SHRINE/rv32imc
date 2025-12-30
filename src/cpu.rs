@@ -236,6 +236,7 @@ impl Cpu {
                     _ => self.handle_trap(2),
                 }
                 0b101 => self.c_j(inst_bin),
+                0b110 => self.c_beqz(inst_bin),
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),
