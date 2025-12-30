@@ -14,6 +14,10 @@ impl MockBus {
     pub(super) fn write_inst32(&mut self, addr: u32, inst: u32) {
         self.write32(addr, inst);
     }
+
+    pub(super) fn write_inst16(&mut self, addr: u32, inst: u16) {
+        self.write16(addr, inst);
+    }
 }
 
 impl Bus for MockBus {

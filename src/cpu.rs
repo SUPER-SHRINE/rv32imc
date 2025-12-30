@@ -14,6 +14,7 @@ use privilege_mode::PrivilegeMode;
 pub enum StepResult {
     Ok,
     Trap(u32),
+    Jumped,
 }
 
 /// CPU の内部状態
@@ -43,8 +44,24 @@ impl Cpu {
 
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
-        let inst_bin = self.fetch(bus);
-        self.execute(inst_bin, bus)
+        let (inst_bin, quadrant) = self.fetch(bus);
+        if quadrant == 0b11 {
+            // 末尾が 0b11 なら 32bit 命令.
+            let result  = self.execute32(inst_bin, bus);
+            match result {
+                StepResult::Ok => self.pc += 4,
+                _ => (),
+            }
+            result
+        } else {
+            // 末尾が 0b11 以外なら 16bit 命令.
+            let result = self.execute16(inst_bin as u16, quadrant, bus);
+            match result {
+                StepResult::Ok => self.pc += 2,
+                _ => (),
+            }
+            result
+        }
     }
 
     /// レジスタの状態をダンプ
@@ -55,13 +72,22 @@ impl Cpu {
         println!("pc : 0x{:08x}", self.pc);
     }
 
-    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> u32 {
-        bus.read32(self.pc)
+    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> (u32, u16) {
+        let inst_low = bus.read16(self.pc);
+        let quadrant = self.decode_quadrant(inst_low);
+        if quadrant == 0b11 {
+            // 32-bit instruction
+            let inst_high = bus.read16(self.pc + 2);
+            let inst_bin = ((inst_high as u32) << 16) | inst_low as u32;
+            (inst_bin, quadrant)
+        } else {
+            // 16-bit instruction
+            (inst_low as u32, quadrant)
+        }
     }
 
-    fn execute<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let opcode = inst_bin & 0x7f;
-        match opcode {
+    fn execute32<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
+        match self.decode_opcode(inst_bin) {
             0b0110111 => self.lui(inst_bin),
             0b0010111 => self.auipc(inst_bin),
             0b1101111 => self.jal(inst_bin),
@@ -169,6 +195,16 @@ impl Cpu {
                 0b111 => self.csrrci(inst_bin),
                 _ => self.handle_trap(2),
             },
+            _ => self.handle_trap(2),
+        }
+    }
+
+    fn execute16<B: bus::Bus>(&mut self, inst_bin: u16, quadrant: u16, _bus: &mut B) -> StepResult {
+        match quadrant {
+            0b00 => match self.decode_c_funct3(inst_bin) {
+                0b000 => self.c_addi4spn(inst_bin),
+                _ => self.handle_trap(2),
+            }
             _ => self.handle_trap(2),
         }
     }
