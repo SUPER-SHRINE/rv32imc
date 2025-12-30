@@ -700,4 +700,10 @@ impl Cpu {
         self.regs[rd] = self.regs[rd].wrapping_sub(self.regs[rs2]);
         StepResult::Ok
     }
+
+    pub(super) fn c_xor(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, rs2) = self.decode_ca_type(inst_bin);
+        self.regs[rd] ^= self.regs[rs2];
+        StepResult::Ok
+    }
 }
