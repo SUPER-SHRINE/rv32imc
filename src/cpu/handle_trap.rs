@@ -3,8 +3,8 @@ use crate::cpu::privilege_mode::PrivilegeMode;
 
 impl Cpu {
     pub(super) fn handle_trap(&mut self, exception_code: u32) -> StepResult {
-        // 1. mepc に現在の PC を保存(復帰時に再度 ECALL が呼ばれないように PC に +4 しておく)
-        self.csr.mepc = self.pc + 4;
+        // 1. mepc に現在の PC を保存
+        self.csr.mepc = self.pc;
 
         // 2. mcause に例外コードを設定
         self.csr.mcause = exception_code;
