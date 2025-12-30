@@ -689,3 +689,53 @@ fn test_c_slli_hint_and_reserved() {
         _ => panic!("Should trap for rd=x0 in C.SLLI"),
     }
 }
+
+#[test]
+fn test_c_mv() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.mv x10, x11
+    // rd = 10 (01010)
+    // rs2 = 11 (01011)
+    // inst bits:
+    // 15:12 = 1000 (funct4)
+    // 11:7  = 01010 (rd = x10)
+    // 6:2   = 01011 (rs2 = x11)
+    // 1:0   = 10 (quadrant 2)
+    // 0b1000_01010_01011_10 = 0x852e
+
+    let inst = 0x852e;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[11] = 0x12345678;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0x12345678);
+    assert_eq!(cpu.pc, 0x202);
+
+    // c.mv x1, x2
+    // rd = 1, rs2 = 2
+    // 0b1000_00001_00010_10 = 0x808a
+    let mut cpu = Cpu::new(0x300);
+    let inst = 0x808a;
+    bus.write_inst16(0x300, inst);
+    cpu.regs[2] = 0xdeadbeef;
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0xdeadbeef);
+}
+
+#[test]
+fn test_c_mv_reserved() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+    cpu.csr.mtvec = 0x100;
+
+    // rd = 0 is reserved
+    // c.mv x0, x11
+    // 0b1000_00000_01011_10 = 0x802e
+    let inst = 0x802e;
+    bus.write_inst16(0x200, inst);
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x100);
+    assert_eq!(cpu.csr.mcause, 2);
+}

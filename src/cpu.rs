@@ -250,7 +250,7 @@ impl Cpu {
                             if rs2 == 0 {
                                 self.c_jr(inst_bin)
                             } else {
-                                self.handle_trap(2)
+                                self.c_mv(inst_bin)
                             }
                         }
                         _ => self.handle_trap(2),
