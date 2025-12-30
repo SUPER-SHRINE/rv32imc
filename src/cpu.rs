@@ -1,11 +1,10 @@
 mod csr;
 mod decode;
-mod execute;
 mod handle_trap;
 mod privilege_mode;
-
-#[cfg(test)]
-mod tests;
+mod rv32i;
+mod rv32m;
+mod rv32c;
 
 use super::bus;
 use csr::Csr;
