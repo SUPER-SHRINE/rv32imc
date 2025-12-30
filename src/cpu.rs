@@ -11,6 +11,7 @@ use super::bus;
 use csr::Csr;
 use privilege_mode::PrivilegeMode;
 
+#[derive(Debug)]
 pub enum StepResult {
     Ok,
     Trap(u32),
