@@ -141,6 +141,34 @@ impl Cpu {
         (8 + rs1_prime, 8 + rs2_prime, imm as u32)
     }
 
+    pub(super) fn decode_cj_type(&self, inst_bin: u16) -> u32 {
+        // imm[11|4|9:8|10|6|7|3:1|5] bit structure in C.JAL:
+        // inst[12]    -> imm[11]
+        // inst[11]    -> imm[4]
+        // inst[10:9]  -> imm[9:8]
+        // inst[8]     -> imm[10]
+        // inst[7]     -> imm[6]
+        // inst[6]     -> imm[7]
+        // inst[5:3]   -> imm[3:1]
+        // inst[2]     -> imm[5]
+
+        let i11 = (inst_bin >> 12) & 0x1;
+        let i10 = (inst_bin >> 8) & 0x1;
+        let i9_8 = (inst_bin >> 9) & 0x3;
+        let i7 = (inst_bin >> 6) & 0x1;
+        let i6 = (inst_bin >> 7) & 0x1;
+        let i5 = (inst_bin >> 2) & 0x1;
+        let i4 = (inst_bin >> 11) & 0x1;
+        let i3_1 = (inst_bin >> 3) & 0x7;
+
+        let imm = (i11 << 11) | (i10 << 10) | (i9_8 << 8) | (i7 << 7) | (i6 << 6) | (i5 << 5) | (i4 << 4) | (i3_1 << 1);
+
+        // Sign extension from 12th bit (bit 11 of imm)
+        let imm = ((imm as i32) << 20 >> 20) as u32;
+
+        imm
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }

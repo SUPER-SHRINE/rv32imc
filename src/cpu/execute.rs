@@ -620,4 +620,11 @@ impl Cpu {
         }
         StepResult::Ok
     }
+
+    pub(super) fn c_jal(&mut self, inst_bin: u16) -> StepResult {
+        let imm = self.decode_cj_type(inst_bin);
+        self.regs[1] = self.pc.wrapping_add(2);
+        self.pc = self.pc.wrapping_add(imm);
+        StepResult::Jumped
+    }
 }
