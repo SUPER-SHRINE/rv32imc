@@ -636,4 +636,19 @@ impl Cpu {
         self.regs[rd] = imm;
         StepResult::Ok
     }
+
+    pub(super) fn c_lui(&mut self, inst_bin: u16) -> StepResult {
+        let (rd, imm) = self.decode_ci_type(inst_bin);
+        if rd == 0 || rd == 2 {
+            return self.handle_trap(2); // rd=0 is reserved, rd=2 is C.ADDI16SP
+        }
+        // C.LUI loads the 6-bit immediate into bits [17:12], then sign-extends.
+        // But wait, the spec says "loads the non-zero 6-bit immediate into bits 17-12, then sign-extends".
+        // Our decode_ci_type returns a sign-extended 32-bit value from bits [12|6:2] of inst.
+        // For C.LUI, the 6 bits are imm[17:12].
+        
+        let imm_u32 = imm << 12;
+        self.regs[rd] = imm_u32;
+        StepResult::Ok
+    }
 }

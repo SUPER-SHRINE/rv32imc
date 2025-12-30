@@ -166,3 +166,68 @@ fn test_c_li_reserved() {
     assert_eq!(cpu.csr.mcause, 2);
     assert_eq!(cpu.csr.mepc, 0x0);
 }
+
+#[test]
+fn test_c_lui() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    // c.lui x10, 1
+    // quadrant: 01, funct3: 011
+    // rd: x10 (01010)
+    // imm: 1 (000001)
+    // imm[5]: 0, imm[4:0]: 00001
+    // inst: 011 0 01010 00001 01 -> 0b0110010100000101 -> 0x6505
+    let inst = 0x6505;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0x1000);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.lui x11, -1 (0b111111) -> imm = -1
+    // rd: x11 (01011)
+    // imm[5]: 1, imm[4:0]: 11111
+    // inst: 011 1 01011 11111 01 -> 0b0111010111111101 -> 0x75fd
+    let inst = 0x75fd;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[11], 0xffff_f000);
+    assert_eq!(cpu.pc, 0x4);
+}
+
+#[test]
+fn test_c_lui_reserved() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    cpu.csr.mtvec = 0x100;
+
+    // rd=0 is reserved
+    // c.lui x0, 1
+    // inst: 011 0 00000 00001 01 -> 0b0110000000000101 -> 0x6005
+    let inst = 0x6005;
+    bus.write_inst16(0x0, inst);
+
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap"),
+    }
+    
+    // rd=2 is C.ADDI16SP (not C.LUI)
+    // But since we didn't implement C.ADDI16SP yet, it should trap in our current implementation of c_lui
+    // Actually, c_lui handles rd=2 as trap.
+    cpu.pc = 0x200;
+    cpu.csr.mepc = 0x200;
+    // c.lui x2, 1
+    // inst: 011 0 00010 00001 01 -> 0b0110000100000101 -> 0x6105
+    let inst = 0x6105;
+    bus.write_inst16(0x200, inst);
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap"),
+    }
+}
