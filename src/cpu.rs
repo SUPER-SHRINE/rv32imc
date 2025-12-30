@@ -259,6 +259,8 @@ impl Cpu {
                                 self.ebreak()
                             } else if rs2 == 0 {
                                 self.c_jalr(inst_bin)
+                            } else {
+                                self.c_add(inst_bin)
                             }
                         }
                         _ => self.handle_trap(2),

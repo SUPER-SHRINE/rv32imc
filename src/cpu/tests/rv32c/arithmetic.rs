@@ -739,3 +739,39 @@ fn test_c_mv_reserved() {
     assert_eq!(cpu.pc, 0x100);
     assert_eq!(cpu.csr.mcause, 2);
 }
+
+#[test]
+fn test_c_add() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.add x10, x11
+    // rd = 10 (01010)
+    // rs2 = 11 (01011)
+    // inst bits:
+    // 15:12 = 1001 (funct4)
+    // 11:7  = 01010 (rd = x10)
+    // 6:2   = 01011 (rs2 = x11)
+    // 1:0   = 10 (quadrant 2)
+    // 0b1001_01010_01011_10 = 0x952e
+
+    let inst = 0x952e;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[10] = 0x1234;
+    cpu.regs[11] = 0x5678;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[10], 0x1234 + 0x5678);
+    assert_eq!(cpu.pc, 0x202);
+
+    // c.add x1, x2 (wrapping)
+    let mut cpu = Cpu::new(0x300);
+    let inst = 0x908a; // rd=1, rs2=2
+    bus.write_inst16(0x300, inst);
+    cpu.regs[1] = 0xffff_ffff;
+    cpu.regs[2] = 1;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[1], 0);
+    assert_eq!(cpu.pc, 0x302);
+}

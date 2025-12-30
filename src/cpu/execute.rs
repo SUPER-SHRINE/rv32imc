@@ -797,4 +797,11 @@ impl Cpu {
         self.regs[1] = next_pc;
         StepResult::Jumped
     }
+
+    pub(super) fn c_add(&mut self, inst_bin: u16) -> StepResult {
+        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+        let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
+        self.regs[rd] = self.regs[rd].wrapping_add(self.regs[rs2]);
+        StepResult::Ok
+    }
 }
