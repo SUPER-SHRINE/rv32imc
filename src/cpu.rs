@@ -134,6 +134,7 @@ impl Cpu {
                 0b101 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.srl(inst_bin),
                     0b0100000 => self.sra(inst_bin),
+                    0b0000001 => self.divu(inst_bin),
                     _ => self.handle_trap(2),
                 },
                 0b110 => self.or(inst_bin),
