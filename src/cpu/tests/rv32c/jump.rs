@@ -491,3 +491,37 @@ fn test_c_bnez_negative() {
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 - 10);
 }
+
+#[test]
+fn test_c_jr() {
+    let mut cpu = Cpu::new(0x200);
+    let mut bus = MockBus::new();
+
+    // c.jr x1
+    // rs1 = 1
+    // inst bits:
+    // 15:12 = 1000 (funct4)
+    // 11:7  = 00001 (rs1 = x1)
+    // 6:2   = 00000
+    // 1:0   = 10 (quadrant 2)
+    // 0b1000_00001_00000_10 = 0x8082
+
+    let inst = 0x8082;
+    bus.write_inst16(0x200, inst);
+    cpu.regs[1] = 0x400;
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x400);
+
+    // c.jr x5
+    // rs1 = 5
+    // 0b1000_00101_00000_10 = 0x8282
+    let mut cpu = Cpu::new(0x300);
+    let inst = 0x8282;
+    bus.write_inst16(0x300, inst);
+    cpu.regs[5] = 0x601; // address should be aligned to 2 bytes, but C.JR clears the last bit?
+    // Spec says: "C.JR ... PC = x[rs1] & ~1"
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.pc, 0x600);
+}

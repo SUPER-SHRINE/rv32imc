@@ -243,6 +243,19 @@ impl Cpu {
             0b10 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_slli(inst_bin),
                 0b010 => self.c_lwsp(inst_bin, bus),
+                0b100 => {
+                    let rs2 = (inst_bin >> 2) & 0x1f;
+                    match self.decode_c_funct4(inst_bin) {
+                        0b1000 => {
+                            if rs2 == 0 {
+                                self.c_jr(inst_bin)
+                            } else {
+                                self.handle_trap(2)
+                            }
+                        }
+                        _ => self.handle_trap(2),
+                    }
+                }
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),

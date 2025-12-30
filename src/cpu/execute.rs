@@ -616,6 +616,15 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn c_jr(&mut self, inst_bin: u16) -> StepResult {
+        let (rs1, rs2) = self.decode_cr_type(inst_bin);
+        if rs1 == 0 || rs2 != 0 {
+            return self.handle_trap(2); // C.JR: rs1 != 0, rs2 == 0
+        }
+        self.pc = self.regs[rs1] & !1;
+        StepResult::Jumped
+    }
+
     pub(super) fn c_sw<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
         let (rs1, rs2, imm) = self.decode_cs_type(inst_bin);
         let addr = self.regs[rs1].wrapping_add(imm);
