@@ -169,6 +169,28 @@ impl Cpu {
         imm
     }
 
+    pub(super) fn decode_c_addi16sp_imm(&self, inst_bin: u16) -> u32 {
+        // imm[9|4|6|8:7|5] bit structure in C.ADDI16SP:
+        // inst[12] -> imm[9]
+        // inst[6]  -> imm[4]
+        // inst[5]  -> imm[6]
+        // inst[4:3] -> imm[8:7]
+        // inst[2]  -> imm[5]
+
+        let i9 = (inst_bin >> 12) & 0x1;
+        let i8_7 = (inst_bin >> 3) & 0x3;
+        let i6 = (inst_bin >> 5) & 0x1;
+        let i5 = (inst_bin >> 2) & 0x1;
+        let i4 = (inst_bin >> 6) & 0x1;
+
+        let imm = (i9 << 9) | (i8_7 << 7) | (i6 << 6) | (i5 << 5) | (i4 << 4);
+
+        // Sign extension from 10th bit (bit 9 of imm)
+        let imm = ((imm as i32) << 22 >> 22) as u32;
+
+        imm
+    }
+
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }

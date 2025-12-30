@@ -637,6 +637,15 @@ impl Cpu {
         StepResult::Ok
     }
 
+    pub(super) fn c_addi16sp(&mut self, inst_bin: u16) -> StepResult {
+        let imm = self.decode_c_addi16sp_imm(inst_bin);
+        if imm == 0 {
+            return self.handle_trap(2); // Reserved
+        }
+        self.regs[2] = self.regs[2].wrapping_add(imm);
+        StepResult::Ok
+    }
+
     pub(super) fn c_lui(&mut self, inst_bin: u16) -> StepResult {
         let (rd, imm) = self.decode_ci_type(inst_bin);
         if rd == 0 || rd == 2 {

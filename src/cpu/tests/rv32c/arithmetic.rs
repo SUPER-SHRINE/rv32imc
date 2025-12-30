@@ -168,6 +168,91 @@ fn test_c_li_reserved() {
 }
 
 #[test]
+fn test_c_addi16sp() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+
+    cpu.regs[2] = 1024; // sp = 1024
+
+    // c.addi16sp sp, 16
+    // quadrant: 01, funct3: 011
+    // rd: x2 (00010)
+    // imm: 16 (0000010000) -> 16の倍数なので imm=1 (0b000001)
+    // imm[9|4|6|8:7|5]
+    // 9: 0, 8: 0, 7: 0, 6: 0, 5: 0, 4: 1
+    // inst[12] = imm[9] = 0
+    // inst[6] = imm[4] = 1
+    // inst[5] = imm[6] = 0
+    // inst[4:3] = imm[8:7] = 00
+    // inst[2] = imm[5] = 0
+    // inst: 011 0 00010 10000 01 -> 0b0110000101000001 -> 0x6141
+    let inst = 0x6141;
+    bus.write_inst16(0x0, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 1024 + 16);
+    assert_eq!(cpu.pc, 0x2);
+
+    // c.addi16sp sp, -16
+    // imm: -16 (1111110000) -> imm = -1 (0b111111)
+    // 9: 1, 8: 1, 7: 1, 6: 1, 5: 1, 4: 1
+    // inst[12] = imm[9] = 1
+    // inst[6] = imm[4] = 1
+    // inst[5] = imm[6] = 1
+    // inst[4:3] = imm[8:7] = 11
+    // inst[2] = imm[5] = 1
+    // inst: 011 1 00010 11111 01 -> 0b0111000101111101 -> 0x717d
+    let inst = 0x717d;
+    bus.write_inst16(0x2, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 1024);
+    assert_eq!(cpu.pc, 0x4);
+
+    // c.addi16sp sp, 496 (max positive)
+    // imm: 496 = 0b0111110000 -> imm[9:4] = 011111
+    // 9: 0, 8: 1, 7: 1, 6: 1, 5: 1, 4: 1
+    // inst[12] = 0, inst[6] = 1, inst[5] = 1, inst[4:3] = 11, inst[2] = 1
+    // inst: 011 0 00010 11111 01 -> 0b0110000101111101 -> 0x617d
+    let inst = 0x617d;
+    bus.write_inst16(0x4, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 1024 + 496);
+    assert_eq!(cpu.pc, 0x6);
+
+    // c.addi16sp sp, -512 (max negative)
+    // imm: -512 = 0b1000000000 -> imm[9:4] = 100000
+    // 9: 1, 8: 0, 7: 0, 6: 0, 5: 0, 4: 0
+    // inst[12] = 1, inst[6] = 0, inst[5] = 0, inst[4:3] = 00, inst[2] = 0
+    // inst: 011 1 00010 00000 01 -> 0b0111000100000001 -> 0x7101
+    let inst = 0x7101;
+    bus.write_inst16(0x6, inst);
+
+    cpu.step(&mut bus);
+    assert_eq!(cpu.regs[2], 1024 + 496 - 512);
+    assert_eq!(cpu.pc, 0x8);
+}
+
+#[test]
+fn test_c_addi16sp_reserved() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = MockBus::new();
+    cpu.csr.mtvec = 0x100;
+
+    // imm = 0 is reserved
+    // inst: 011 0 00010 00000 01 -> 0b0110000100000001 -> 0x6101
+    let inst = 0x6101;
+    bus.write_inst16(0x0, inst);
+
+    let result = cpu.step(&mut bus);
+    match result {
+        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
+        _ => panic!("Should trap"),
+    }
+}
+
+#[test]
 fn test_c_lui() {
     let mut cpu = Cpu::new(0x0);
     let mut bus = MockBus::new();
@@ -210,21 +295,6 @@ fn test_c_lui_reserved() {
     let inst = 0x6005;
     bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
-    match result {
-        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
-        _ => panic!("Should trap"),
-    }
-    
-    // rd=2 is C.ADDI16SP (not C.LUI)
-    // But since we didn't implement C.ADDI16SP yet, it should trap in our current implementation of c_lui
-    // Actually, c_lui handles rd=2 as trap.
-    cpu.pc = 0x200;
-    cpu.csr.mepc = 0x200;
-    // c.lui x2, 1
-    // inst: 011 0 00010 00001 01 -> 0b0110000100000101 -> 0x6105
-    let inst = 0x6105;
-    bus.write_inst16(0x200, inst);
     let result = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),

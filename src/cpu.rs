@@ -211,7 +211,14 @@ impl Cpu {
                 0b000 => self.c_addi(inst_bin),
                 0b001 => self.c_jal(inst_bin),
                 0b010 => self.c_li(inst_bin),
-                0b011 => self.c_lui(inst_bin),
+                0b011 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    if rd == 2 {
+                        self.c_addi16sp(inst_bin)
+                    } else {
+                        self.c_lui(inst_bin)
+                    }
+                }
                 _ => self.handle_trap(2),
             },
             _ => self.handle_trap(2),
