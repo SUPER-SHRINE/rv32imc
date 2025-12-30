@@ -535,8 +535,8 @@ impl Cpu {
     pub(super) fn mulhsu(&mut self, inst_bin: u32) -> StepResult {
         let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
         if rd != 0 {
-            let src1 = self.regs[rs1] as i32 as i64;
-            let src2 = self.regs[rs2] as u64 as i64;
+            let src1 = self.regs[rs1] as i32 as i128;
+            let src2 = self.regs[rs2] as u64 as i128;
             let result = src1 * src2;
             self.regs[rd] = (result >> 32) as u32;
         }
