@@ -34,4 +34,12 @@ pub trait Bus {
 
     /// クロックを進める
     fn tick(&mut self) {}
+
+    /// PLIC からの割り込みを取得する (Claim)
+    fn plic_claim(&mut self) -> u32 {
+        0
+    }
+
+    /// PLIC に割り込みの完了を通知する (Complete)
+    fn plic_complete(&mut self, _source_id: u32) {}
 }

@@ -95,6 +95,16 @@ impl Cpu {
         println!("mtval  : 0x{:08x}", self.csr.mtval);
     }
 
+    /// PLIC から割り込みを取得する (Claim)
+    pub fn claim_interrupt<B: bus::Bus>(&mut self, bus: &mut B) -> u32 {
+        bus.plic_claim()
+    }
+
+    /// PLIC に割り込み完了を通知する (Complete)
+    pub fn complete_interrupt<B: bus::Bus>(&mut self, bus: &mut B, source_id: u32) {
+        bus.plic_complete(source_id);
+    }
+
     fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> (u32, u16) {
         let inst_low = bus.read16(self.pc);
         let quadrant = self.decode_quadrant(inst_low);
