@@ -74,7 +74,7 @@ impl Plic {
         }
     }
 
-    fn claim(&mut self) -> u32 {
+    pub fn claim(&mut self) -> u32 {
         let mut max_priority = 0;
         let mut max_id = 0;
 
@@ -99,7 +99,7 @@ impl Plic {
         }
     }
 
-    fn complete(&mut self, source_id: u32) {
+    pub fn complete(&mut self, source_id: u32) {
         if source_id > 0 && source_id < SOURCE_COUNT as u32 {
             // claimed ビットをクリアする
             self.claimed &= !(1 << source_id);

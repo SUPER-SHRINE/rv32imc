@@ -52,11 +52,13 @@ pub struct Plic {
 
 ### Bus との統合
 `Bus` トレイトの実装内で、`0x0c00_0000` 付近のアドレスへのアクセスを `Plic` 構造体へ振り分けます。
+また、`Bus` トレイトに `plic_claim()` および `plic_complete(id)` メソッドを追加し、MMIO 経由でなくても直接 PLIC を操作できるようにしています。
 
 ### CPU との連携
 - `Cpu::step` のループ内で、毎ステップ（または定期的に）`plic.get_interrupt_level()` を確認します。
 - `true` であれば `cpu.csr.mip` の `MEIP` ビットをセットします。
 - 割り込みが複数重なった場合、RISC-V の仕様（外部 > ソフトウェア > タイマー）および PLIC 内部の優先度に従って `handle_trap` を呼び出すように `Cpu` のトラップ判定ロジックを拡張します。
+- `Cpu` 構造体には `claim_interrupt` と `complete_interrupt` メソッドが用意されており、これらを通じて PLIC の状態を操作可能です。
 
 ## 5. 段階的な実装
 1.  **最小構成**: `priority` と `threshold` を無視し、単一の割り込みソースが `mip.MEIP` を立てるだけの仕組みを作る。

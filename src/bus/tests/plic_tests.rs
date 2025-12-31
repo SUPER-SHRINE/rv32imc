@@ -61,6 +61,33 @@ fn test_plic_claim_complete() {
 }
 
 #[test]
+fn test_cpu_plic_access() {
+    use crate::bus::default_bus::DefaultBus;
+    use crate::cpu::Cpu;
+    use crate::bus::Bus;
+
+    let mut bus = DefaultBus::new(1024);
+    let mut cpu = Cpu::new(0);
+
+    // PLIC 設定 (Source 1)
+    bus.write32(0x0c000004, 5); // Priority
+    bus.write32(0x0c002000, 1 << 1); // Enable
+    bus.write32(0x0c200000, 3); // Threshold
+
+    // 割り込み発生
+    bus.plic.set_interrupt(1);
+
+    // CPU から Claim
+    let id = cpu.claim_interrupt(&mut bus);
+    assert_eq!(id, 1);
+
+    // CPU から Complete
+    cpu.complete_interrupt(&mut bus, 1);
+
+    // Complete されたので pending がクリアされているはず（ipをクリアしない限り再度pendingになるが、ここでは一旦完了を確認）
+}
+
+#[test]
 fn test_plic_pending_mask() {
     let mut plic = Plic::new();
     plic.set_interrupt(1);

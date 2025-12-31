@@ -121,4 +121,12 @@ impl Bus for DefaultBus {
     fn tick(&mut self) {
         self.clint.tick();
     }
+
+    fn plic_claim(&mut self) -> u32 {
+        self.plic.claim()
+    }
+
+    fn plic_complete(&mut self, source_id: u32) {
+        self.plic.complete(source_id);
+    }
 }
