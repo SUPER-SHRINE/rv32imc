@@ -11,9 +11,11 @@ pub struct Plic {
     pub enabled: u32,
     /// 割り込みを受け付ける優先度の閾値 (0x200000)
     pub threshold: u32,
-    /// 現在処理中の割り込み ID (Option で管理するか、0x200004 レジスタの状態として管理するか)
+    /// 現在処理中の割り込み ID を管理するビットマスク
     /// RISC-V PLIC の仕様では、Claim すると ID が返り、Complete されるまでその ID は再送されない。
     pub claimed: u32,
+    /// 外部からの割り込み信号（レベルトリガー用）
+    pub ip: u32,
 }
 
 impl Plic {
@@ -24,6 +26,7 @@ impl Plic {
             enabled: 0,
             threshold: 0,
             claimed: 0,
+            ip: 0,
         }
     }
 
@@ -75,9 +78,10 @@ impl Plic {
         let mut max_priority = 0;
         let mut max_id = 0;
 
-        let pending_enabled = self.pending & self.enabled;
+        // 有効かつ保留中で、かつ現在処理中（Claimed）ではないものを対象とする
+        let pending_enabled_not_claimed = self.pending & self.enabled & !self.claimed;
         for id in 1..SOURCE_COUNT {
-            if (pending_enabled >> id) & 1 == 1 {
+            if (pending_enabled_not_claimed >> id) & 1 == 1 {
                 if self.priorities[id] > max_priority {
                     max_priority = self.priorities[id];
                     max_id = id as u32;
@@ -86,9 +90,9 @@ impl Plic {
         }
 
         if max_id > 0 && max_priority > self.threshold {
-            // Claim されたら pending をクリアする
+            // Claim されたら pending をクリアし、claimed にセットする
             self.pending &= !(1 << max_id);
-            self.claimed = max_id;
+            self.claimed |= 1 << max_id;
             max_id
         } else {
             0
@@ -96,23 +100,40 @@ impl Plic {
     }
 
     fn complete(&mut self, source_id: u32) {
-        if self.claimed == source_id {
-            self.claimed = 0;
-            // 本来はここで再度 pending を受け入れ可能にするなどの処理が必要な場合があるが
-            // 今回の簡易実装では claim 時に pending をクリアしているので特になし
+        if source_id > 0 && source_id < SOURCE_COUNT as u32 {
+            // claimed ビットをクリアする
+            self.claimed &= !(1 << source_id);
+            // レベルトリガーの考慮：もしデバイス信号がまだ High なら再度 pending にする
+            if (self.ip >> source_id) & 1 == 1 {
+                self.pending |= 1 << source_id;
+            }
         }
     }
 
-    /// 外部からの割り込み信号をセットする（デバッグ・テスト用またはデバイス接続用）
+    /// 外部からの割り込み信号をセットする（レベルトリガーを想定）
     pub fn set_interrupt(&mut self, source_id: u32) {
         if source_id > 0 && source_id < SOURCE_COUNT as u32 {
-            self.pending |= 1 << source_id;
+            self.ip |= 1 << source_id;
+            // Claimed でなければ pending に反映
+            if (self.claimed >> source_id) & 1 == 0 {
+                self.pending |= 1 << source_id;
+            }
+        }
+    }
+
+    /// 外部からの割り込み信号をクリアする
+    pub fn clear_interrupt(&mut self, source_id: u32) {
+        if source_id > 0 && source_id < SOURCE_COUNT as u32 {
+            self.ip &= !(1 << source_id);
+            // pending もクリア（ただし、すでに Claimed なものは pending はすでに 0 なはず）
+            self.pending &= !(1 << source_id);
         }
     }
 
     /// CPU への割り込み通知が必要かどうかを判定する
     pub fn get_interrupt_level(&self) -> bool {
-        // 有効かつ保留中の割り込みの中で、最大の優先度が閾値を超えているか
+        // 有効かつ保留中（かつ未処理）の割り込みの中で、最大の優先度が閾値を超えているか
+        // pending にはすでに !claimed のロジックが含まれている（claim 時にクリアされるため）
         let pending_enabled = self.pending & self.enabled;
         if pending_enabled == 0 {
             return false;

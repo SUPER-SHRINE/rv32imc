@@ -117,6 +117,9 @@ impl Cpu {
         if bus.get_interrupt_level() {
             self.csr.mip |= 1 << 11; // MEIP
         } else {
+            // 注意: 本来は Claim 時に PLIC が CPU の MEIP を下げるという副作用があるが、
+            // 現在の get_interrupt_level() 方式でも、Claim 後は最高優先度が
+            // threshold を下回る（あるいは 0 になる）ため、MEIP が下げられる挙動は再現される。
             self.csr.mip &= !(1 << 11);
         }
 
