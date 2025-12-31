@@ -38,26 +38,32 @@ QEMU の `virt` マシンなどの構成を参考に、以下のレジスタセ�
 ## 4. エミュレータでの実装戦略
 
 ### PLIC 構造体
-`src/bus/plic.rs` (新設) に実装します。
+`src/bus/plic.rs` に実装されています。
 
 ```rust
 pub struct Plic {
-    priorities: [u32; SOURCE_COUNT],
-    pending: u32,
-    enabled: u32,
-    threshold: u32,
-    claimed: Option<u32>,
+    /// 各割り込みソースの優先度 (0x000000 + 4*id)
+    pub priorities: [u32; SOURCE_COUNT],
+    /// 割り込みが発生しているソースのビットマスク (0x001000)
+    pub pending: u32,
+    /// 割り込みを有効にするかどうかのビットマスク (0x002000)
+    pub enabled: u32,
+    /// 割り込みを受け付ける優先度の閾値 (0x200000)
+    pub threshold: u32,
+    /// 現在処理中の割り込み ID を管理するビットマスク
+    pub claimed: u32,
+    /// 外部からの割り込み信号（レベルトリガー用）
+    pub ip: u32,
 }
 ```
 
 ### Bus との統合
 `Bus` トレイトの実装内で、`0x0c00_0000` 付近のアドレスへのアクセスを `Plic` 構造体へ振り分けます。
-また、`Bus` トレイトに `plic_claim()` および `plic_complete(id)` メソッドを追加し、MMIO 経由でなくても直接 PLIC を操作できるようにしています。
 
 ### CPU との連携
-- `Cpu::step` のループ内で、毎ステップ（または定期的に）`plic.get_interrupt_level()` を確認します。
+- `Cpu::step` のループ内で、毎ステップ `bus.tick()` を通じてデバイス状態が更新された後、`check_interrupts` 内で `bus.get_interrupt_level()` を確認します。
 - `true` であれば `cpu.csr.mip` の `MEIP` ビットをセットします。
-- 割り込みが複数重なった場合、RISC-V の仕様（外部 > ソフトウェア > タイマー）および PLIC 内部の優先度に従って `handle_trap` を呼び出すように `Cpu` のトラップ判定ロジックを拡張します。
+- 割り込みが発生した場合、RISC-V の仕様（外部 > ソフトウェア > タイマー）に従って `handle_trap` を呼び出します。
 - `Cpu` 構造体には `claim_interrupt` と `complete_interrupt` メソッドが用意されており、これらを通じて PLIC の状態を操作可能です。
 
 ## 5. 段階的な実装
