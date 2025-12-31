@@ -123,6 +123,13 @@ impl Cpu {
             self.csr.mip &= !(1 << 11);
         }
 
+        // タイマー割り込み信号を mip.MTIP に反映させる
+        if bus.get_timer_interrupt_level() {
+            self.csr.mip |= 1 << 7; // MTIP
+        } else {
+            self.csr.mip &= !(1 << 7);
+        }
+
         // mip と mie の論理積をとる
         let pending_interrupts = self.csr.mip & self.csr.mie;
 
@@ -136,7 +143,10 @@ impl Cpu {
             return Some(0x8000_000b); // MSB=1, Code=11
         }
 
-        // TODO: 他の割り込み（タイマー、ソフトウェア）の処理
+        // タイマー割り込み (Machine Timer Interrupt)
+        if (pending_interrupts & (1 << 7)) != 0 {
+            return Some(0x8000_0007); // MSB=1, Code=7
+        }
 
         None
     }

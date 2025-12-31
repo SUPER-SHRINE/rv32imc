@@ -20,4 +20,9 @@ pub trait Bus {
     fn get_interrupt_level(&self) -> bool {
         false
     }
+
+    /// タイマー割り込み要求レベルを取得する（デフォルトは false）
+    fn get_timer_interrupt_level(&self) -> bool {
+        false
+    }
 }
