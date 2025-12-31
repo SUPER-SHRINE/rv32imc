@@ -42,7 +42,8 @@ RUN autoconf && \
 # バイナリを抽出するための準備
 RUN mkdir -p /work/output && \
     find isa -maxdepth 1 -type f -executable -name "rv32u[imc]-p-*" -exec cp {} /work/output/ \; && \
+    find isa -maxdepth 1 -type f -executable -name "rv32mi-p-*" -exec cp {} /work/output/ \; && \
     cd /work/output && \
-    for f in rv32u[imc]-p-*; do riscv64-unknown-elf-objcopy -O binary $f $f.bin; done
+    for f in rv32*-p-*; do riscv64-unknown-elf-objcopy -O binary $f $f.bin; done
 
 CMD ["tar", "cvf", "-", "-C", "/work/output", "."]

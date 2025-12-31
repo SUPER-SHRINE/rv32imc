@@ -7,6 +7,9 @@ mod rv32m;
 mod rv32c;
 mod zicsr;
 
+#[cfg(test)]
+mod interrupt;
+
 use super::bus;
 use csr::Csr;
 use privilege_mode::PrivilegeMode;
@@ -45,23 +48,34 @@ impl Cpu {
 
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
+        // 実行前に割り込みをチェック
+        if let Some(interrupt_code) = self.check_interrupts(bus) {
+            return self.handle_trap(interrupt_code, 0);
+        }
+
         let (inst_bin, quadrant) = self.fetch(bus);
-        if quadrant == 0b11 {
-            // 末尾が 0b11 なら 32bit 命令.
-            let result  = self.execute32(inst_bin, bus);
-            match result {
-                StepResult::Ok => self.pc += 4,
-                _ => (),
-            }
-            result
+
+        let result = if quadrant == 0b11 {
+            self.execute32(inst_bin, bus)
         } else {
-            // 末尾が 0b11 以外なら 16bit 命令.
-            let result = self.execute16(inst_bin as u16, quadrant, bus);
-            match result {
-                StepResult::Ok => self.pc += 2,
-                _ => (),
+            self.execute16(inst_bin as u16, quadrant, bus)
+        };
+
+        match result {
+            StepResult::Ok => {
+                self.pc += if quadrant == 0b11 { 4 } else { 2 };
+                StepResult::Ok
             }
-            result
+            StepResult::Trap(code) => {
+                let mtval = if code == 2 {
+                    inst_bin
+                } else {
+                    0
+                };
+                self.handle_trap(code, mtval);
+                StepResult::Trap(code)
+            }
+            _ => result,
         }
     }
 
@@ -71,6 +85,11 @@ impl Cpu {
             println!("x{:02}: 0x{:08x}", i, reg);
         }
         println!("pc : 0x{:08x}", self.pc);
+        println!("mstatus: 0x{:08x}", self.csr.mstatus);
+        println!("mtvec  : 0x{:08x}", self.csr.mtvec);
+        println!("mepc   : 0x{:08x}", self.csr.mepc);
+        println!("mcause : 0x{:08x}", self.csr.mcause);
+        println!("mtval  : 0x{:08x}", self.csr.mtval);
     }
 
     fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> (u32, u16) {
@@ -85,6 +104,51 @@ impl Cpu {
             // 16-bit instruction
             (inst_low as u32, quadrant)
         }
+    }
+
+    /// 割り込みのチェックを行い、発生すべき割り込みがあればその例外コードを返す
+    fn check_interrupts<B: bus::Bus>(&mut self, bus: &B) -> Option<u32> {
+        // mstatus.MIE が 0 の場合は割り込みを受け付けない
+        if (self.csr.mstatus & (1 << 3)) == 0 {
+            return None;
+        }
+
+        // PLIC 等の外部信号を mip.MEIP に反映させる (最小構成として)
+        if bus.get_interrupt_level() {
+            self.csr.mip |= 1 << 11; // MEIP
+        } else {
+            // 注意: 本来は Claim 時に PLIC が CPU の MEIP を下げるという副作用があるが、
+            // 現在の get_interrupt_level() 方式でも、Claim 後は最高優先度が
+            // threshold を下回る（あるいは 0 になる）ため、MEIP が下げられる挙動は再現される。
+            self.csr.mip &= !(1 << 11);
+        }
+
+        // タイマー割り込み信号を mip.MTIP に反映させる
+        if bus.get_timer_interrupt_level() {
+            self.csr.mip |= 1 << 7; // MTIP
+        } else {
+            self.csr.mip &= !(1 << 7);
+        }
+
+        // mip と mie の論理積をとる
+        let pending_interrupts = self.csr.mip & self.csr.mie;
+
+        if pending_interrupts == 0 {
+            return None;
+        }
+
+        // 優先順位: 外部割り込み > ソフトウェア割り込み > タイマー割り込み
+        // 外部割り込み (Machine External Interrupt)
+        if (pending_interrupts & (1 << 11)) != 0 {
+            return Some(0x8000_000b); // MSB=1, Code=11
+        }
+
+        // タイマー割り込み (Machine Timer Interrupt)
+        if (pending_interrupts & (1 << 7)) != 0 {
+            return Some(0x8000_0007); // MSB=1, Code=7
+        }
+
+        None
     }
 
     fn execute32<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
@@ -102,11 +166,11 @@ impl Cpu {
                 0b101 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.srli(inst_bin),
                     0b0100000 => self.srai(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b110 => self.ori(inst_bin),
                 0b111 => self.andi(inst_bin),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b1100011 => match self.decode_funct3(inst_bin) {
                 0b000 => self.beq(inst_bin),
@@ -115,7 +179,7 @@ impl Cpu {
                 0b101 => self.bge(inst_bin),
                 0b110 => self.bltu(inst_bin),
                 0b111 => self.bgeu(inst_bin),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b0000011 => match self.decode_funct3(inst_bin) {
                 0b000 => self.lb(inst_bin, bus),
@@ -123,70 +187,71 @@ impl Cpu {
                 0b010 => self.lw(inst_bin, bus),
                 0b100 => self.lbu(inst_bin, bus),
                 0b101 => self.lhu(inst_bin, bus),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b0100011 => match self.decode_funct3(inst_bin) {
                     0b000 => self.sb(inst_bin, bus),
                     0b001 => self.sh(inst_bin, bus),
                     0b010 => self.sw(inst_bin, bus),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b0110011 => match self.decode_funct3(inst_bin) {
                 0b000 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.add(inst_bin),
                     0b0100000 => self.sub(inst_bin),
                     0b0000001 => self.mul(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b001 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.sll(inst_bin),
                     0b0000001 => self.mulh(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b010 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.slt(inst_bin),
                     0b0000001 => self.mulhsu(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b011 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.sltu(inst_bin),
                     0b0000001 => self.mulhu(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b100 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.xor(inst_bin),
                     0b0000001 => self.div(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b101 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.srl(inst_bin),
                     0b0100000 => self.sra(inst_bin),
                     0b0000001 => self.divu(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b110 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.or(inst_bin),
                     0b0000001 => self.rem(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
                 0b111 => match self.decode_funct7(inst_bin) {
                     0b0000000 => self.and(inst_bin),
                     0b0000001 => self.remu(inst_bin),
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 },
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             }
             0b0001111 => match self.decode_funct3(inst_bin) {
                 0b000 => self.fence(),
                 0b001 => self.fence_i(),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b1110011 => match self.decode_funct3(inst_bin) {
                 0b000 => match (inst_bin >> 20) & 0xfff {
                     0b000000000000 => self.ecall(),
                     0b000000000001 => self.ebreak(),
                     0b001100000010 => self.mret(),
-                    _ => self.handle_trap(2),
+                    0b000100000101 => StepResult::Ok, // wfi: NOP
+                    _ => StepResult::Trap(2),
                 },
                 0b001 => self.csrrw(inst_bin),
                 0b010 => self.csrrs(inst_bin),
@@ -194,9 +259,9 @@ impl Cpu {
                 0b101 => self.csrrwi(inst_bin),
                 0b110 => self.csrrsi(inst_bin),
                 0b111 => self.csrrci(inst_bin),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
-            _ => self.handle_trap(2),
+            _ => StepResult::Trap(2),
         }
     }
 
@@ -206,7 +271,7 @@ impl Cpu {
                 0b000 => self.c_addi4spn(inst_bin),
                 0b010 => self.c_lw(inst_bin, bus),
                 0b110 => self.c_sw(inst_bin, bus),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b01 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_addi(inst_bin),
@@ -230,16 +295,16 @@ impl Cpu {
                             0b01 => self.c_xor(inst_bin),
                             0b10 => self.c_or(inst_bin),
                             0b11 => self.c_and(inst_bin),
-                            _ => self.handle_trap(2),
+                            _ => StepResult::Trap(2),
                         },
-                        _ => self.handle_trap(2),
+                        _ => StepResult::Trap(2),
                     }
-                    _ => self.handle_trap(2),
+                    _ => StepResult::Trap(2),
                 }
                 0b101 => self.c_j(inst_bin),
                 0b110 => self.c_beqz(inst_bin),
                 0b111 => self.c_bnez(inst_bin),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
             0b10 => match self.decode_c_funct3(inst_bin) {
                 0b000 => self.c_slli(inst_bin),
@@ -264,13 +329,13 @@ impl Cpu {
                                 self.c_add(inst_bin)
                             }
                         }
-                        _ => self.handle_trap(2),
+                        _ => StepResult::Trap(2),
                     }
                 }
                 0b110 => self.c_swsp(inst_bin, bus),
-                _ => self.handle_trap(2),
+                _ => StepResult::Trap(2),
             },
-            _ => self.handle_trap(2),
+            _ => StepResult::Trap(2),
         }
     }
 }

@@ -4,7 +4,7 @@ impl Cpu {
     pub(crate) fn c_addi4spn(&mut self, inst_bin: u16) -> StepResult {
         let (rd, imm) = self.decode_ciw_type(inst_bin);
         if imm == 0 {
-            return self.handle_trap(2); // Reserved
+            return StepResult::Trap(2); // Reserved
         }
         self.regs[rd] = self.regs[2].wrapping_add(imm);
         StepResult::Ok
@@ -23,7 +23,7 @@ impl Cpu {
     pub(crate) fn c_lwsp<B: crate::bus::Bus>(&mut self, inst_bin: u16, bus: &mut B) -> StepResult {
         let (rd, imm) = self.decode_c_lwsp_type(inst_bin);
         if rd == 0 {
-            return self.handle_trap(2); // Reserved
+            return StepResult::Trap(2); // Reserved
         }
         let addr = self.regs[2].wrapping_add(imm);
         self.regs[rd] = bus.read32(addr);
@@ -40,7 +40,7 @@ impl Cpu {
     pub(crate) fn c_jr(&mut self, inst_bin: u16) -> StepResult {
         let (rs1, rs2) = self.decode_cr_type(inst_bin);
         if rs1 == 0 || rs2 != 0 {
-            return self.handle_trap(2); // C.JR: rs1 != 0, rs2 == 0
+            return StepResult::Trap(2); // C.JR: rs1 != 0, rs2 == 0
         }
         self.pc = self.regs[rs1] & !1;
         StepResult::Jumped
@@ -49,7 +49,7 @@ impl Cpu {
     pub(crate) fn c_mv(&mut self, inst_bin: u16) -> StepResult {
         let (rd, rs2) = self.decode_cr_type(inst_bin);
         if rd == 0 || rs2 == 0 {
-            return self.handle_trap(2); // C.MV: rd != 0, rs2 != 0
+            return StepResult::Trap(2); // C.MV: rd != 0, rs2 != 0
         }
         self.regs[rd] = self.regs[rs2];
         StepResult::Ok
@@ -80,7 +80,7 @@ impl Cpu {
     pub(crate) fn c_li(&mut self, inst_bin: u16) -> StepResult {
         let (rd, imm) = self.decode_ci_type(inst_bin);
         if rd == 0 {
-            return self.handle_trap(2); // Reserved for HINTs
+            return StepResult::Trap(2); // Reserved for HINTs
         }
         self.regs[rd] = imm;
         StepResult::Ok
@@ -89,7 +89,7 @@ impl Cpu {
     pub(crate) fn c_addi16sp(&mut self, inst_bin: u16) -> StepResult {
         let imm = self.decode_c_addi16sp_imm(inst_bin);
         if imm == 0 {
-            return self.handle_trap(2); // Reserved
+            return StepResult::Trap(2); // Reserved
         }
         self.regs[2] = self.regs[2].wrapping_add(imm);
         StepResult::Ok
@@ -98,7 +98,7 @@ impl Cpu {
     pub(crate) fn c_lui(&mut self, inst_bin: u16) -> StepResult {
         let (rd, imm) = self.decode_ci_type(inst_bin);
         if rd == 0 || rd == 2 {
-            return self.handle_trap(2); // rd=0 is reserved, rd=2 is C.ADDI16SP
+            return StepResult::Trap(2); // rd=0 is reserved, rd=2 is C.ADDI16SP
         }
         // C.LUI loads the 6-bit immediate into bits [17:12], then sign-extends.
         // But wait, the spec says "loads the non-zero 6-bit immediate into bits 17-12, then sign-extends".
@@ -114,7 +114,7 @@ impl Cpu {
         let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
         // shamt[5] must be 0 for RV32C
         if (inst_bin >> 12) & 0x1 != 0 {
-            return self.handle_trap(2);
+            return StepResult::Trap(2);
         }
         if shamt == 0 {
             // shamt=0 is reserved for HINTs
@@ -128,7 +128,7 @@ impl Cpu {
         let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
         // shamt[5] must be 0 for RV32C
         if (inst_bin >> 12) & 0x1 != 0 {
-            return self.handle_trap(2);
+            return StepResult::Trap(2);
         }
         if shamt == 0 {
             // shamt=0 is reserved for HINTs
@@ -197,11 +197,11 @@ impl Cpu {
     pub(crate) fn c_slli(&mut self, inst_bin: u16) -> StepResult {
         let (rd, shamt) = self.decode_ci_shamt_type(inst_bin);
         if rd == 0 {
-            return self.handle_trap(2); // Reserved
+            return StepResult::Trap(2); // Reserved
         }
         // shamt[5] must be 0 for RV32C
         if (inst_bin >> 12) & 0x1 != 0 {
-            return self.handle_trap(2);
+            return StepResult::Trap(2);
         }
         if shamt == 0 {
             // shamt=0 is reserved for HINTs
