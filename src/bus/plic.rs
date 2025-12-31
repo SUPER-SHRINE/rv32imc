@@ -26,4 +26,17 @@ impl Plic {
             claimed: 0,
         }
     }
+
+    /// 外部からの割り込み信号をセットする（デバッグ・テスト用またはデバイス接続用）
+    pub fn set_interrupt(&mut self, source_id: u32) {
+        if source_id > 0 && source_id < SOURCE_COUNT as u32 {
+            self.pending |= 1 << source_id;
+        }
+    }
+
+    /// CPU への割り込み通知が必要かどうかを判定する
+    pub fn get_interrupt_level(&self) -> bool {
+        // 最小構成: 有効かつ保留中の割り込みがあれば true を返す
+        (self.pending & self.enabled) != 0
+    }
 }

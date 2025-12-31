@@ -7,6 +7,9 @@ mod rv32m;
 mod rv32c;
 mod zicsr;
 
+#[cfg(test)]
+mod interrupt;
+
 use super::bus;
 use csr::Csr;
 use privilege_mode::PrivilegeMode;
@@ -45,6 +48,11 @@ impl Cpu {
 
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
+        // 実行前に割り込みをチェック
+        if let Some(interrupt_code) = self.check_interrupts(bus) {
+            return self.handle_trap(interrupt_code);
+        }
+
         let (inst_bin, quadrant) = self.fetch(bus);
         if quadrant == 0b11 {
             // 末尾が 0b11 なら 32bit 命令.
@@ -85,6 +93,38 @@ impl Cpu {
             // 16-bit instruction
             (inst_low as u32, quadrant)
         }
+    }
+
+    /// 割り込みのチェックを行い、発生すべき割り込みがあればその例外コードを返す
+    fn check_interrupts<B: bus::Bus>(&mut self, bus: &B) -> Option<u32> {
+        // mstatus.MIE が 0 の場合は割り込みを受け付けない
+        if (self.csr.mstatus & (1 << 3)) == 0 {
+            return None;
+        }
+
+        // PLIC 等の外部信号を mip.MEIP に反映させる (最小構成として)
+        if bus.get_interrupt_level() {
+            self.csr.mip |= 1 << 11; // MEIP
+        } else {
+            self.csr.mip &= !(1 << 11);
+        }
+
+        // mip と mie の論理積をとる
+        let pending_interrupts = self.csr.mip & self.csr.mie;
+
+        if pending_interrupts == 0 {
+            return None;
+        }
+
+        // 優先順位: 外部割り込み > ソフトウェア割り込み > タイマー割り込み
+        // 外部割り込み (Machine External Interrupt)
+        if (pending_interrupts & (1 << 11)) != 0 {
+            return Some(0x8000_000b); // MSB=1, Code=11
+        }
+
+        // TODO: 他の割り込み（タイマー、ソフトウェア）の処理
+
+        None
     }
 
     fn execute32<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {

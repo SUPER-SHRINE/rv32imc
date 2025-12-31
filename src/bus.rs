@@ -12,4 +12,9 @@ pub trait Bus {
     fn write8(&mut self, addr: u32, val: u8);
     fn write16(&mut self, addr: u32, val: u16);
     fn write32(&mut self, addr: u32, val: u32);
+
+    /// PLIC からの割り込み要求レベルを取得する（デフォルトは false）
+    fn get_interrupt_level(&self) -> bool {
+        false
+    }
 }
