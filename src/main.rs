@@ -52,6 +52,9 @@ fn run_test(path: &Path) -> Result<bool, String> {
         }
         steps += 1;
         if steps > max_steps {
+            println!("Timeout reached at steps: {}", steps);
+            println!("Final State:");
+            cpu.dump_registers();
             return Err("Timeout".to_string());
         }
     }

@@ -51,9 +51,6 @@ impl Csr {
     }
 
     pub fn write(&mut self, addr: u32, val: u32) -> Result<(), ()> {
-        // if addr == 0x300 {
-        //      println!("mstatus Write: val=0x{:08x}, old=0x{:08x}", val, self.mstatus);
-        // }
         // 読み取り専用 CSR (bits 11-10 == 11) への書き込みは不正命令
         // ただし、0xc00-0xc1f (counters), 0xc80-0xc9f (counters high) は読み取り専用
         if (addr >> 10) & 0b11 == 0b11 {
@@ -62,8 +59,17 @@ impl Csr {
 
         match addr {
             0x300 => {
-                // mstatus: 制限付き書き込み (SD, MPP, MPIE, MIE, MPRV, MXR, SUM, TVM, TW, TSR など)
+                // mstatus: 制限付き書き込み
+                // MPP は Machine (3) と User (0) のみサポート
                 let mask = 0x807E1888;
+                let mut val = val;
+                
+                let mpp = (val >> 11) & 0b11;
+                if mpp == 1 || mpp == 2 {
+                    // Sモードや保留モードが指定されたら Userモードに丸める
+                    val &= !(0b11 << 11);
+                }
+                
                 let new_val = (self.mstatus & !mask) | (val & mask);
                 self.mstatus = new_val;
                 Ok(())

@@ -375,7 +375,6 @@ impl Cpu {
         // ただし、riscv-tests の中には特権レベルが Machine でないときに mret を実行して
         // 例外が発生することを確認するものがある。
         if self.mode != PrivilegeMode::Machine {
-            println!("mret failed: mode={:?}", self.mode);
             return StepResult::Trap(2); // Illegal Instruction
         }
 
@@ -386,14 +385,13 @@ impl Cpu {
         let mpie = (self.csr.mstatus >> 7) & 1;
         self.csr.mstatus &= !(1 << 3);  // MIE = 0
         self.csr.mstatus |= mpie << 3;  // MIE = MPIE
-        self.csr.mstatus |= 1 << 7;     // MPIE = 1 (spec says MPIE is set to 1)
+        self.csr.mstatus |= 1 << 7;     // MPIE = 1
 
         let mpp = (self.csr.mstatus >> 11) & 0b11;
         self.mode = match mpp {
             0 => PrivilegeMode::User,
-            1 => PrivilegeMode::Supervisor,
             3 => PrivilegeMode::Machine,
-            _ => PrivilegeMode::Machine, // Should not happen
+            _ => PrivilegeMode::User, // Sモードはサポートしていないので User に落とす
         };
         // MPP is set to the least-privileged mode supported (User=0)
         self.csr.mstatus &= !(0b11 << 11);
