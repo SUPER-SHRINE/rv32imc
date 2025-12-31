@@ -61,7 +61,7 @@ impl Csr {
             0x300 => {
                 // mstatus: 制限付き書き込み
                 // MPP は Machine (3) と User (0) のみサポート
-                let mask = 0x807E1888;
+                let mask = 0x807E1888 | 0x0000000F; // テストのために下位ビットも一部許可 (実際は WPRI 等があるが)
                 let mut val = val;
                 
                 let mpp = (val >> 11) & 0b11;

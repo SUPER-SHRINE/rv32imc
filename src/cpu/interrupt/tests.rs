@@ -36,18 +36,19 @@ fn test_external_interrupt() {
 
     // 1. 割り込みを有効化する
     // mstatus.MIE (bit 3) = 1
-    cpu.csr.write(0x300, 1 << 3);
+    let _ = cpu.csr.write(0x300, 1 << 3);
     // mie.MEIE (bit 11) = 1
-    cpu.csr.write(0x304, 1 << 11);
+    let _ = cpu.csr.write(0x304, 1 << 11);
     // mtvec を設定
     let trap_handler_addr = 0x100;
-    cpu.csr.write(0x305, trap_handler_addr);
+    let _ = cpu.csr.write(0x305, trap_handler_addr);
 
     // バスにダミー命令を配置 (ADDI x0, x0, 0)
     bus.mock_bus.write_inst32(0, 0x00000013);
 
     // 2. PLIC で割り込みを発生させる
     bus.plic.enabled |= 1 << 1; // ID 1 を有効化
+    bus.plic.priorities[1] = 1; // ID 1 の優先度を 1 に設定 (閾値 0 より大きくする)
     bus.plic.set_interrupt(1);  // ID 1 を保留中に
 
     // 3. 実行
@@ -61,16 +62,16 @@ fn test_external_interrupt() {
     assert_eq!(cpu.pc, trap_handler_addr);
 
     // mepc に元の PC (0) が保存されているはず
-    assert_eq!(cpu.csr.read(0x341), 0);
+    assert_eq!(cpu.csr.read(0x341).unwrap(), 0);
 
     // mcause に例外コードが設定されているはず
-    assert_eq!(cpu.csr.read(0x342), 0x8000_000b);
+    assert_eq!(cpu.csr.read(0x342).unwrap(), 0x8000_000b);
 
     // mstatus.MIE が 0 になっているはず
-    assert_eq!((cpu.csr.read(0x300) >> 3) & 1, 0);
+    assert_eq!((cpu.csr.read(0x300).unwrap() >> 3) & 1, 0);
 
     // mstatus.MPIE が 1 (元のMIE) になっているはず
-    assert_eq!((cpu.csr.read(0x300) >> 7) & 1, 1);
+    assert_eq!((cpu.csr.read(0x300).unwrap() >> 7) & 1, 1);
 }
 
 #[test]
@@ -79,8 +80,8 @@ fn test_interrupt_disabled_by_mstatus() {
     let mut bus = InterruptTestBus::new();
 
     // 1. mstatus.MIE = 0 (無効), mie.MEIE = 1 (有効)
-    cpu.csr.write(0x300, 0);
-    cpu.csr.write(0x304, 1 << 11);
+    let _ = cpu.csr.write(0x300, 0);
+    let _ = cpu.csr.write(0x304, 1 << 11);
 
     bus.mock_bus.write_inst32(0, 0x00000013);
     bus.plic.enabled |= 1 << 1;
@@ -101,8 +102,8 @@ fn test_interrupt_disabled_by_mie() {
     let mut bus = InterruptTestBus::new();
 
     // 1. mstatus.MIE = 1 (有効), mie.MEIE = 0 (無効)
-    cpu.csr.write(0x300, 1 << 3);
-    cpu.csr.write(0x304, 0);
+    let _ = cpu.csr.write(0x300, 1 << 3);
+    let _ = cpu.csr.write(0x304, 0);
 
     bus.mock_bus.write_inst32(0, 0x00000013);
     bus.plic.enabled |= 1 << 1;
