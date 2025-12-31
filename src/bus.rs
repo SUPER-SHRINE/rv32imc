@@ -1,6 +1,7 @@
 pub mod default_bus;
 pub mod mock_bus;
 pub mod plic;
+pub mod clint;
 
 #[cfg(test)]
 mod tests;
@@ -25,4 +26,12 @@ pub trait Bus {
     fn get_timer_interrupt_level(&self) -> bool {
         false
     }
+
+    /// ソフトウェア割り込み要求レベルを取得する（デフォルトは false）
+    fn get_software_interrupt_level(&self) -> bool {
+        false
+    }
+
+    /// クロックを進める
+    fn tick(&mut self) {}
 }
