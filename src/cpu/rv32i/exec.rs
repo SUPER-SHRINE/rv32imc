@@ -227,6 +227,9 @@ impl Cpu {
 
     pub(crate) fn slli(&mut self, inst_bin: u32) -> StepResult {
         let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+        if (imm & !0x1f) != 0 {
+            return StepResult::Trap(2);
+        }
         let shamt = imm & 0x1f;
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] << shamt;
@@ -236,6 +239,9 @@ impl Cpu {
 
     pub(crate) fn srli(&mut self, inst_bin: u32) -> StepResult {
         let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+        if (imm & !0x1f) != 0 {
+            return StepResult::Trap(2);
+        }
         let shamt = imm & 0x1f;
         if rd != 0 {
             self.regs[rd] = self.regs[rs1] >> shamt;
@@ -245,6 +251,10 @@ impl Cpu {
 
     pub(crate) fn srai(&mut self, inst_bin: u32) -> StepResult {
         let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+        // SRAI has bit 30 set (0x400 in imm[11:0]), but other bits in imm[11:5] should be 0
+        if (imm & !0x1f) != 0x400 {
+            return StepResult::Trap(2);
+        }
         let shamt = imm & 0x1f;
         if rd != 0 {
             self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
@@ -353,125 +363,40 @@ impl Cpu {
             PrivilegeMode::Supervisor => 9,
             PrivilegeMode::Machine => 11,
         };
-        self.handle_trap(code)
+        StepResult::Trap(code)
     }
 
     pub(crate) fn ebreak(&mut self) -> StepResult {
-        self.handle_trap(3) // Breakpoint exception code is 3
+        StepResult::Trap(3) // Breakpoint exception code is 3
     }
 
     pub(crate) fn mret(&mut self) -> StepResult {
+        // mret は Machine モードでのみ実行可能
+        // ただし、riscv-tests の中には特権レベルが Machine でないときに mret を実行して
+        // 例外が発生することを確認するものがある。
+        if self.mode != PrivilegeMode::Machine {
+            return StepResult::Trap(2); // Illegal Instruction
+        }
+
         // PC を mepc に復帰
-        self.pc = self.csr.mepc;
+        let next_pc = self.csr.mepc;
 
         // mstatus の復帰
         let mpie = (self.csr.mstatus >> 7) & 1;
         self.csr.mstatus &= !(1 << 3);  // MIE = 0
         self.csr.mstatus |= mpie << 3;  // MIE = MPIE
-        self.csr.mstatus |= 1 << 7;     // MPIE = 1 (spec says MPIE is set to 1)
+        self.csr.mstatus |= 1 << 7;     // MPIE = 1
 
         let mpp = (self.csr.mstatus >> 11) & 0b11;
         self.mode = match mpp {
             0 => PrivilegeMode::User,
-            1 => PrivilegeMode::Supervisor,
             3 => PrivilegeMode::Machine,
-            _ => PrivilegeMode::Machine, // Should not happen
+            _ => PrivilegeMode::User, // Sモードはサポートしていないので User に落とす
         };
         // MPP is set to the least-privileged mode supported (User=0)
         self.csr.mstatus &= !(0b11 << 11);
+
+        self.pc = next_pc;
         StepResult::Jumped
-    }
-
-    pub(crate) fn csrrw(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-        let new_val = self.regs[rs1 as usize];
-
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        self.csr.write(csr_addr, new_val);
-        StepResult::Ok
-    }
-
-    pub(crate) fn csrrs(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-        let set_mask = self.regs[rs1 as usize];
-
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        if rs1 != 0 {
-            self.csr.write(csr_addr, old_val | set_mask);
-        }
-        StepResult::Ok
-    }
-
-    pub(crate) fn csrrc(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-        let clear_mask = self.regs[rs1 as usize];
-
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        if rs1 != 0 {
-            self.csr.write(csr_addr, old_val & !clear_mask);
-        }
-        StepResult::Ok
-    }
-
-    pub(crate) fn csrrwi(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        self.csr.write(csr_addr, uimm);
-        StepResult::Ok
-    }
-
-    pub(crate) fn csrrsi(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        if uimm != 0 {
-            self.csr.write(csr_addr, old_val | uimm);
-        }
-        StepResult::Ok
-    }
-
-    pub(crate) fn csrrci(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
-
-        let old_val = self.csr.read(csr_addr);
-        if rd != 0 {
-            self.regs[rd as usize] = old_val;
-        }
-        if uimm != 0 {
-            self.csr.write(csr_addr, old_val & !uimm);
-        }
-        StepResult::Ok
     }
 }

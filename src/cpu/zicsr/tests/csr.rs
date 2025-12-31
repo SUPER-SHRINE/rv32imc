@@ -82,7 +82,7 @@ fn test_csrrs() {
     // x2 should have the old mstatus value (0b1100 = 12)
     assert_eq!(cpu.regs[2], 12);
     // mstatus should be 0b1100 | 0b0011 = 0b1111 (15)
-    assert_eq!(cpu.csr.mstatus, 15);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 15);
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn test_csrrs_x0_rs1() {
     // x2 should have the old mstatus value (12)
     assert_eq!(cpu.regs[2], 12);
     // mstatus should NOT be updated
-    assert_eq!(cpu.csr.mstatus, 12);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 12);
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn test_csrrc() {
     // x2 should have the old mstatus value (0b1111 = 15)
     assert_eq!(cpu.regs[2], 15);
     // mstatus should be 0b1111 & !0b1010 = 0b0101 (5)
-    assert_eq!(cpu.csr.mstatus, 5);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 5);
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn test_csrrc_x0_rs1() {
     // x2 should have the old mstatus value (15)
     assert_eq!(cpu.regs[2], 15);
     // mstatus should NOT be updated
-    assert_eq!(cpu.csr.mstatus, 15);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 15);
 }
 
 #[test]
@@ -229,7 +229,7 @@ fn test_csrrsi() {
     // x2 should have the old mstatus value (12)
     assert_eq!(cpu.regs[2], 12);
     // mstatus should be 0b1100 | 0b0011 = 0b1111 (15)
-    assert_eq!(cpu.csr.mstatus, 15);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 15);
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn test_csrrsi_x0_uimm() {
     // x2 should have the old mstatus value (12)
     assert_eq!(cpu.regs[2], 12);
     // mstatus should NOT be updated
-    assert_eq!(cpu.csr.mstatus, 12);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 12);
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn test_csrrci() {
     // x2 should have the old mstatus value (15)
     assert_eq!(cpu.regs[2], 15);
     // mstatus should be 0b1111 & !0b1010 = 0b0101 (5)
-    assert_eq!(cpu.csr.mstatus, 5);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 5);
 }
 
 #[test]
@@ -309,5 +309,5 @@ fn test_csrrci_x0_uimm() {
     // x2 should have the old mstatus value (15)
     assert_eq!(cpu.regs[2], 15);
     // mstatus should NOT be updated
-    assert_eq!(cpu.csr.mstatus, 15);
+    assert_eq!(cpu.csr.read(0x300).unwrap(), 15);
 }

@@ -1,15 +1,27 @@
 use super::Bus;
+use super::plic::Plic;
+use super::clint::Clint;
 use std::fs;
 use std::io;
 
+pub const PLIC_BASE: u32 = 0x0c00_0000;
+pub const PLIC_SIZE: u32 = 0x0040_0000;
+
+pub const CLINT_BASE: u32 = 0x0200_0000;
+pub const CLINT_SIZE: u32 = 0x0001_0000;
+
 pub struct DefaultBus {
     pub memory: Vec<u8>,
+    pub plic: Plic,
+    pub clint: Clint,
 }
 
 impl DefaultBus {
     pub fn new(size: usize) -> Self {
         Self {
             memory: vec![0; size],
+            plic: Plic::new(),
+            clint: Clint::new(),
         }
     }
 
@@ -26,35 +38,95 @@ impl DefaultBus {
 
 impl Bus for DefaultBus {
     fn read8(&mut self, addr: u32) -> u8 {
-        self.memory[addr as usize]
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.read(addr - PLIC_BASE) as u8
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.read(addr - CLINT_BASE) as u8
+        } else {
+            self.memory[addr as usize]
+        }
     }
 
     fn read16(&mut self, addr: u32) -> u16 {
-        let addr = addr as usize;
-        u16::from_le_bytes([self.memory[addr], self.memory[addr + 1]])
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.read(addr - PLIC_BASE) as u16
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.read(addr - CLINT_BASE) as u16
+        } else {
+            let addr = addr as usize;
+            u16::from_le_bytes([self.memory[addr], self.memory[addr + 1]])
+        }
     }
 
     fn read32(&mut self, addr: u32) -> u32 {
-        let addr = addr as usize;
-        u32::from_le_bytes([
-            self.memory[addr],
-            self.memory[addr + 1],
-            self.memory[addr + 2],
-            self.memory[addr + 3],
-        ])
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.read(addr - PLIC_BASE)
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.read(addr - CLINT_BASE)
+        } else {
+            let addr = addr as usize;
+            u32::from_le_bytes([
+                self.memory[addr],
+                self.memory[addr + 1],
+                self.memory[addr + 2],
+                self.memory[addr + 3],
+            ])
+        }
     }
 
     fn write8(&mut self, addr: u32, val: u8) {
-        self.memory[addr as usize] = val;
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.write(addr - PLIC_BASE, val as u32);
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.write(addr - CLINT_BASE, val as u32);
+        } else {
+            self.memory[addr as usize] = val;
+        }
     }
 
     fn write16(&mut self, addr: u32, val: u16) {
-        let addr = addr as usize;
-        self.memory[addr..addr + 2].copy_from_slice(&val.to_le_bytes());
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.write(addr - PLIC_BASE, val as u32);
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.write(addr - CLINT_BASE, val as u32);
+        } else {
+            let addr = addr as usize;
+            self.memory[addr..addr + 2].copy_from_slice(&val.to_le_bytes());
+        }
     }
 
     fn write32(&mut self, addr: u32, val: u32) {
-        let addr = addr as usize;
-        self.memory[addr..addr + 4].copy_from_slice(&val.to_le_bytes());
+        if addr >= PLIC_BASE && addr < PLIC_BASE + PLIC_SIZE {
+            self.plic.write(addr - PLIC_BASE, val);
+        } else if addr >= CLINT_BASE && addr < CLINT_BASE + CLINT_SIZE {
+            self.clint.write(addr - CLINT_BASE, val);
+        } else {
+            let addr = addr as usize;
+            self.memory[addr..addr + 4].copy_from_slice(&val.to_le_bytes());
+        }
+    }
+
+    fn get_interrupt_level(&self) -> bool {
+        self.plic.get_interrupt_level()
+    }
+
+    fn get_timer_interrupt_level(&self) -> bool {
+        self.clint.get_timer_interrupt_level()
+    }
+
+    fn get_software_interrupt_level(&self) -> bool {
+        self.clint.get_software_interrupt_level()
+    }
+
+    fn tick(&mut self) {
+        self.clint.tick();
+    }
+
+    fn plic_claim(&mut self) -> u32 {
+        self.plic.claim()
+    }
+
+    fn plic_complete(&mut self, source_id: u32) {
+        self.plic.complete(source_id);
     }
 }
