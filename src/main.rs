@@ -42,8 +42,11 @@ fn run_test(path: &Path) -> Result<bool, String> {
 
     loop {
         match cpu.step(&mut bus) {
-            cpu::StepResult::Trap(_code) => {
-                break;
+            cpu::StepResult::Trap(code) => {
+                // ecall (8, 9, 11) で終了
+                if code == 8 || code == 9 || code == 11 {
+                    break;
+                }
             }
             _ => (),
         }

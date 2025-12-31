@@ -2,12 +2,15 @@ use crate::cpu::{Cpu, StepResult};
 use crate::cpu::privilege_mode::PrivilegeMode;
 
 impl Cpu {
-    pub(super) fn handle_trap(&mut self, exception_code: u32) -> StepResult {
+    pub(super) fn handle_trap(&mut self, exception_code: u32, mtval: u32) -> StepResult {
         // 1. mepc に現在の PC を保存
         self.csr.mepc = self.pc;
 
         // 2. mcause に例外コードを設定
         self.csr.mcause = exception_code;
+
+        // 3. mtval の設定
+        self.csr.mtval = mtval;
 
         // 3. mstatus の更新 (MPP, MPIE, MIE)
         // mstatus bit fields:
@@ -27,7 +30,18 @@ impl Cpu {
         self.mode = PrivilegeMode::Machine;
 
         // 5. mtvec のアドレスへジャンプ
-        self.pc = self.csr.mtvec;
+        let is_interrupt = (exception_code >> 31) & 1;
+        let mtvec_mode = self.csr.mtvec & 0b11;
+        let mtvec_base = self.csr.mtvec & !0b11;
+
+        if is_interrupt == 1 && mtvec_mode == 1 {
+            // Vectored mode
+            let code = exception_code & 0x7fff_ffff;
+            self.pc = mtvec_base + 4 * code;
+        } else {
+            // Direct mode or exception
+            self.pc = mtvec_base;
+        }
 
         StepResult::Trap(exception_code)
     }
