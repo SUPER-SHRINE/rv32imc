@@ -48,6 +48,9 @@ impl Cpu {
 
     /// 1ステップ実行
     pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
+        // クロックを進める
+        bus.tick();
+
         // 実行前に割り込みをチェック
         if let Some(interrupt_code) = self.check_interrupts(bus) {
             return self.handle_trap(interrupt_code, 0);
@@ -130,6 +133,13 @@ impl Cpu {
             self.csr.mip &= !(1 << 7);
         }
 
+        // ソフトウェア割り込み信号を mip.MSIP に反映させる
+        if bus.get_software_interrupt_level() {
+            self.csr.mip |= 1 << 3; // MSIP
+        } else {
+            self.csr.mip &= !(1 << 3);
+        }
+
         // mip と mie の論理積をとる
         let pending_interrupts = self.csr.mip & self.csr.mie;
 
@@ -141,6 +151,11 @@ impl Cpu {
         // 外部割り込み (Machine External Interrupt)
         if (pending_interrupts & (1 << 11)) != 0 {
             return Some(0x8000_000b); // MSB=1, Code=11
+        }
+
+        // ソフトウェア割り込み (Machine Software Interrupt)
+        if (pending_interrupts & (1 << 3)) != 0 {
+            return Some(0x8000_0003); // MSB=1, Code=3
         }
 
         // タイマー割り込み (Machine Timer Interrupt)
