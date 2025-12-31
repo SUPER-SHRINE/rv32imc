@@ -5,6 +5,7 @@ mod privilege_mode;
 mod rv32i;
 mod rv32m;
 mod rv32c;
+mod zicsr;
 
 use super::bus;
 use csr::Csr;
