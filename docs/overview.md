@@ -18,9 +18,9 @@
 - **C 拡張**: 圧縮命令（16ビット長）。
 
 ### 2. 特権アーキテクチャ (Privileged ISA)
-- マシンモード (Machine Mode) の CSR (Control and Status Registers) の基礎的な実装。
-- 例外（トラップ）ハンドリングのサポート。
-- タイマー割り込みやソフトウェア割り込みの基礎的なサポート（検討中）。
+- マシンモード (Machine Mode) の CSR (Control and Status Registers) の実装。
+- 例外（トラップ）ハンドリングのサポート（Vectored mode 対応）。
+- タイマー割り込み、ソフトウェア割り込み、外部割り込み（PLIC）の完全なサポート。
 
 ### 3. メモリ・バス構成
 - 32ビットアドレス空間。

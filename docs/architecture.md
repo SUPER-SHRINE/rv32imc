@@ -28,6 +28,7 @@ src/
        ├── handle_trap.rs       (例外・トラップ処理の実装)
        ├── csr.rs               (CSR: 制御ステータスレジスタ関連)
        ├── privilege_mode.rs    (特権モードの定義)
+       ├── interrupt.rs         (割り込み処理のテスト用)
        ├── rv32i.rs             (RV32I 命令のディスパッチ)
        ├── rv32m.rs             (RV32M 命令のディスパッチ)
        ├── rv32c.rs             (RV32C 命令のディスパッチ)
@@ -70,6 +71,13 @@ pub trait Bus {
     fn write8(&mut self, addr: u32, val: u8);
     fn write16(&mut self, addr: u32, val: u16);
     fn write32(&mut self, addr: u32, val: u32);
+
+    fn get_interrupt_level(&self) -> bool;
+    fn get_timer_interrupt_level(&self) -> bool;
+    fn get_software_interrupt_level(&self) -> bool;
+    fn tick(&mut self);
+    fn plic_claim(&mut self) -> u32;
+    fn plic_complete(&mut self, source_id: u32);
 }
 ```
 
@@ -86,18 +94,26 @@ pub trait Bus {
 
 1.  **Fetch**: 現在の `pc` から命令を読み取ります。
     - 下位2ビットが `11` でなければ16ビット命令（C拡張）として扱います。
-    - 32ビット命令の場合は `(inst_bin, 0)`、16ビット命令の場合は `(quadrant, inst16)` のような形式でフェッチされます。
+    - 32ビット命令の場合は `(inst_bin, quadrant)`、16ビット命令の場合は `(inst_low, quadrant)` のような形式でフェッチされます。
 2.  **Execute**: 命令バイナリを各拡張モジュール (`rv32i`, `rv32m`, `rv32c`) に振り分けて実行し、`regs` や `pc` を更新します。
 
 ```rust
 impl Cpu {
     pub fn step<B: Bus>(&mut self, bus: &mut B) -> StepResult {
-        let (inst_bin, inst16) = self.fetch(bus);
-        if inst16 == 0 {
+        // クロックを進める
+        bus.tick();
+
+        // 実行前に割り込みをチェック
+        if let Some(interrupt_code) = self.check_interrupts(bus) {
+            return self.handle_trap(interrupt_code, 0);
+        }
+
+        let (inst_bin, quadrant) = self.fetch(bus);
+
+        if quadrant == 0b11 {
             self.execute32(inst_bin, bus)
         } else {
-            let quadrant = (inst16 & 0b11) as u16;
-            self.execute16(inst16, quadrant, bus)
+            self.execute16(inst_bin as u16, quadrant, bus)
         }
     }
 }

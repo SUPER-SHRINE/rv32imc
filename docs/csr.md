@@ -23,29 +23,35 @@ RV32I で定義されている以下の 6 つの命令を実装します。こ�
 
 ```rust
 impl Csr {
-    pub fn read(&self, addr: u32) -> u32 {
+    pub fn read(&self, addr: u32) -> Result<u32, ()> {
         match addr {
-            0x300 => self.mstatus,
-            0x305 => self.mtvec,
-            0x304 => self.mie,
-            0x341 => self.mepc,
-            0x342 => self.mcause,
-            0x343 => self.mtval,
-            0x344 => self.mip,
-            _ => 0,
+            0x300 => Ok(self.mstatus),
+            0x305 => Ok(self.mtvec),
+            0x304 => Ok(self.mie),
+            0x341 => Ok(self.mepc),
+            0x342 => Ok(self.mcause),
+            0x343 => Ok(self.mtval),
+            0x344 => Ok(self.mip),
+            // ... 他の CSR
+            _ => Err(()),
         }
     }
 
-    pub fn write(&mut self, addr: u32, val: u32) {
+    pub fn write(&mut self, addr: u32, val: u32) -> Result<(), ()> {
         match addr {
-            0x300 => self.mstatus = val,
-            0x305 => self.mtvec = val,
-            0x304 => self.mie = val,
-            0x341 => self.mepc = val,
-            0x342 => self.mcause = val,
-            0x343 => self.mtval = val,
-            0x344 => self.mip = val,
-            _ => {}
+            0x300 => {
+                // mstatus の更新ロジック (MPP 等のバリデーション含む)
+                // ...
+                Ok(())
+            }
+            0x305 => { self.mtvec = val; Ok(()) }
+            0x304 => { self.mie = val; Ok(()) }
+            0x341 => { self.mepc = val; Ok(()) }
+            0x342 => { self.mcause = val; Ok(()) }
+            0x343 => { self.mtval = val; Ok(()) }
+            0x344 => { self.mip = val; Ok(()) }
+            // ... 他の CSR
+            _ => Err(()),
         }
     }
 }
