@@ -9,10 +9,12 @@ mod zicsr;
 
 #[cfg(test)]
 mod interrupt;
+mod instruction;
 
 use super::bus;
 use csr::Csr;
 use privilege_mode::PrivilegeMode;
+use instruction::Instruction;
 
 #[derive(Debug)]
 pub enum StepResult {
@@ -34,6 +36,9 @@ pub struct Cpu {
 
     /// 特権モード
     pub mode: PrivilegeMode,
+
+    /// 命令キャッシュ (デコード済み命令を保持)
+    cache: Vec<Option<Box<dyn Instruction>>>,
 }
 
 impl Cpu {
@@ -43,7 +48,13 @@ impl Cpu {
             pc,
             csr: Csr::default(),
             mode: PrivilegeMode::Machine,
+            cache: Vec::new(),
         }
+    }
+
+    /// 命令キャッシュをクリアする
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
     }
 
     /// 1ステップ実行
@@ -56,17 +67,45 @@ impl Cpu {
             return self.handle_trap(interrupt_code, 0);
         }
 
-        let (inst_bin, quadrant) = self.fetch(bus);
-
-        let result = if quadrant == 0b11 {
-            self.execute32(inst_bin, bus)
+        // キャッシュのサイズが足りない場合は拡張 (通常はプログラムロード時に設定するのが望ましいが)
+        // ここでは簡易的に 1MB 程度の初期サイズを持たせるか、必要に応じて拡張する。
+        let pc_idx = self.pc as usize;
+        let (result, inst_bin) = if let Some(inst) = self.cache.get_mut(pc_idx).and_then(|o| o.take()) {
+            // キャッシュヒット
+            let bin = inst.get_inst_bin();
+            let res = inst.execute(self, bus);
+            // execute 内で cache.clear() (fence.i) が呼ばれた可能性があるため
+            // 呼び出し後にキャッシュが存在するか確認して戻す
+            if self.pc as usize == pc_idx && pc_idx < self.cache.len() {
+                 self.cache[pc_idx] = Some(inst);
+            }
+            (res, bin)
         } else {
-            self.execute16(inst_bin as u16, quadrant, bus)
+            // キャッシュミス: デコードしてキャッシュに格納
+            let (inst_bin, quadrant) = self.fetch(bus);
+            let inst_obj: Box<dyn Instruction> = if quadrant == 0b11 {
+                self.decode32_to_obj(inst_bin)
+            } else {
+                self.decode16_to_obj(inst_bin as u16, quadrant)
+            };
+            let res = inst_obj.execute(self, bus);
+            let bin = inst_obj.get_inst_bin();
+            // 同様に execute 内で cache.clear() された可能性を考慮
+            if self.pc as usize == pc_idx {
+                if pc_idx >= self.cache.len() {
+                    self.cache.resize_with(pc_idx + 0x1000, || None);
+                }
+                self.cache[pc_idx] = Some(inst_obj);
+            }
+            (res, bin)
         };
+
+        // 実行結果に基づく PC の更新
+        let pc_inc = if (inst_bin & 0x3) == 0b11 { 4 } else { 2 };
 
         match result {
             StepResult::Ok => {
-                self.pc += if quadrant == 0b11 { 4 } else { 2 };
+                self.pc += pc_inc;
                 StepResult::Ok
             }
             StepResult::Trap(code) => {
@@ -176,191 +215,332 @@ impl Cpu {
         None
     }
 
-    fn execute32<B: bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        match self.decode_opcode(inst_bin) {
-            0b0110111 => self.lui(inst_bin),
-            0b0010111 => self.auipc(inst_bin),
-            0b1101111 => self.jal(inst_bin),
-            0b1100111 => self.jalr(inst_bin),
-            0b0010011 => match self.decode_funct3(inst_bin) {
-                0b000 => self.addi(inst_bin),
-                0b001 => self.slli(inst_bin),
-                0b010 => self.slti(inst_bin),
-                0b011 => self.sltiu(inst_bin),
-                0b100 => self.xori(inst_bin),
-                0b101 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.srli(inst_bin),
-                    0b0100000 => self.srai(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b110 => self.ori(inst_bin),
-                0b111 => self.andi(inst_bin),
-                _ => StepResult::Trap(2),
-            },
-            0b1100011 => match self.decode_funct3(inst_bin) {
-                0b000 => self.beq(inst_bin),
-                0b001 => self.bne(inst_bin),
-                0b100 => self.blt(inst_bin),
-                0b101 => self.bge(inst_bin),
-                0b110 => self.bltu(inst_bin),
-                0b111 => self.bgeu(inst_bin),
-                _ => StepResult::Trap(2),
-            },
-            0b0000011 => match self.decode_funct3(inst_bin) {
-                0b000 => self.lb(inst_bin, bus),
-                0b001 => self.lh(inst_bin, bus),
-                0b010 => self.lw(inst_bin, bus),
-                0b100 => self.lbu(inst_bin, bus),
-                0b101 => self.lhu(inst_bin, bus),
-                _ => StepResult::Trap(2),
-            },
-            0b0100011 => match self.decode_funct3(inst_bin) {
-                    0b000 => self.sb(inst_bin, bus),
-                    0b001 => self.sh(inst_bin, bus),
-                    0b010 => self.sw(inst_bin, bus),
-                _ => StepResult::Trap(2),
-            },
-            0b0110011 => match self.decode_funct3(inst_bin) {
-                0b000 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.add(inst_bin),
-                    0b0100000 => self.sub(inst_bin),
-                    0b0000001 => self.mul(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b001 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.sll(inst_bin),
-                    0b0000001 => self.mulh(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b010 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.slt(inst_bin),
-                    0b0000001 => self.mulhsu(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b011 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.sltu(inst_bin),
-                    0b0000001 => self.mulhu(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b100 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.xor(inst_bin),
-                    0b0000001 => self.div(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b101 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.srl(inst_bin),
-                    0b0100000 => self.sra(inst_bin),
-                    0b0000001 => self.divu(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b110 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.or(inst_bin),
-                    0b0000001 => self.rem(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                0b111 => match self.decode_funct7(inst_bin) {
-                    0b0000000 => self.and(inst_bin),
-                    0b0000001 => self.remu(inst_bin),
-                    _ => StepResult::Trap(2),
-                },
-                _ => StepResult::Trap(2),
+    fn decode32_to_obj(&self, inst_bin: u32) -> Box<dyn Instruction> {
+        let opcode = self.decode_opcode(inst_bin);
+        let funct3 = self.decode_funct3(inst_bin);
+
+        match opcode {
+            0b0110111 => {
+                let (rd, imm) = self.decode_u_type(inst_bin);
+                Box::new(instruction::UType { inst_bin, rd, imm, executor: Cpu::lui })
             }
-            0b0001111 => match self.decode_funct3(inst_bin) {
-                0b000 => self.fence(),
-                0b001 => self.fence_i(),
-                _ => StepResult::Trap(2),
+            0b0010111 => {
+                let (rd, imm) = self.decode_u_type(inst_bin);
+                Box::new(instruction::UType { inst_bin, rd, imm, executor: Cpu::auipc })
+            }
+            0b1101111 => {
+                let (rd, imm) = self.decode_j_type(inst_bin);
+                Box::new(instruction::JType { inst_bin, rd, imm, executor: Cpu::jal })
+            }
+            0b1100111 => {
+                let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+                Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::jalr })
+            }
+            0b0010011 => {
+                let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+                match funct3 {
+                    0b000 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::addi }),
+                    0b001 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::slli }),
+                    0b010 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::slti }),
+                    0b011 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::sltiu }),
+                    0b100 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::xori }),
+                    0b101 => {
+                        let funct7 = self.decode_funct7(inst_bin);
+                        match funct7 {
+                            0b0000000 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::srli }),
+                            0b0100000 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::srai }),
+                            _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                        }
+                    }
+                    0b110 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::ori }),
+                    0b111 => Box::new(instruction::IType { inst_bin, rd, rs1, imm, executor: Cpu::andi }),
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                }
+            }
+            0b1100011 => {
+                let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+                match funct3 {
+                    0b000 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::beq }),
+                    0b001 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::bne }),
+                    0b100 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::blt }),
+                    0b101 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::bge }),
+                    0b110 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::bltu }),
+                    0b111 => Box::new(instruction::BType { inst_bin, rs1, rs2, imm, executor: Cpu::bgeu }),
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                }
+            }
+            0b0000011 => {
+                let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+                match funct3 {
+                    0b000 => Box::new(instruction::ITypeLoad { inst_bin, rd, rs1, imm, executor: Cpu::lb }),
+                    0b001 => Box::new(instruction::ITypeLoad { inst_bin, rd, rs1, imm, executor: Cpu::lh }),
+                    0b010 => Box::new(instruction::ITypeLoad { inst_bin, rd, rs1, imm, executor: Cpu::lw }),
+                    0b100 => Box::new(instruction::ITypeLoad { inst_bin, rd, rs1, imm, executor: Cpu::lbu }),
+                    0b101 => Box::new(instruction::ITypeLoad { inst_bin, rd, rs1, imm, executor: Cpu::lhu }),
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                }
+            }
+            0b0100011 => {
+                let (rs1, rs2, imm) = self.decode_s_type(inst_bin);
+                match funct3 {
+                    0b000 => Box::new(instruction::SType { inst_bin, rs1, rs2, imm, executor: Cpu::sb }),
+                    0b001 => Box::new(instruction::SType { inst_bin, rs1, rs2, imm, executor: Cpu::sh }),
+                    0b010 => Box::new(instruction::SType { inst_bin, rs1, rs2, imm, executor: Cpu::sw }),
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                }
+            }
+            0b0110011 => {
+                let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+                let funct7 = self.decode_funct7(inst_bin);
+                match funct3 {
+                    0b000 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::add }),
+                        0b0100000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::sub }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::mul }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b001 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::sll }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::mulh }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b010 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::slt }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::mulhsu }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b011 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::sltu }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::mulhu }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b100 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::xor }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::div }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b101 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::srl }),
+                        0b0100000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::sra }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::divu }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b110 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::or }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::rem }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    0b111 => match funct7 {
+                        0b0000000 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::and }),
+                        0b0000001 => Box::new(instruction::RType { inst_bin, rd, rs1, rs2, executor: Cpu::remu }),
+                        _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                    },
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
+                }
+            }
+            0b0001111 => match funct3 {
+                0b000 => Box::new(instruction::NoArgsType { inst_bin, executor: Cpu::fence }),
+                0b001 => Box::new(instruction::NoArgsType { inst_bin, executor: Cpu::fence_i }),
+                _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
             },
-            0b1110011 => match self.decode_funct3(inst_bin) {
+            0b1110011 => match funct3 {
                 0b000 => match (inst_bin >> 20) & 0xfff {
-                    0b000000000000 => self.ecall(),
-                    0b000000000001 => self.ebreak(),
-                    0b001100000010 => self.mret(),
-                    0b000100000101 => StepResult::Ok, // wfi: NOP
-                    _ => StepResult::Trap(2),
+                    0b000000000000 => Box::new(instruction::NoArgsType { inst_bin, executor: Cpu::ecall }),
+                    0b000000000001 => Box::new(instruction::NoArgsType { inst_bin, executor: Cpu::ebreak }),
+                    0b001100000010 => Box::new(instruction::NoArgsType { inst_bin, executor: Cpu::mret }),
+                    0b000100000101 => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Ok }), // wfi: NOP
+                    _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
                 },
-                0b001 => self.csrrw(inst_bin),
-                0b010 => self.csrrs(inst_bin),
-                0b011 => self.csrrc(inst_bin),
-                0b101 => self.csrrwi(inst_bin),
-                0b110 => self.csrrsi(inst_bin),
-                0b111 => self.csrrci(inst_bin),
-                _ => StepResult::Trap(2),
+                0b001 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: rs1, csr_addr, executor: Cpu::csrrw })
+                }
+                0b010 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: rs1, csr_addr, executor: Cpu::csrrs })
+                }
+                0b011 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: rs1, csr_addr, executor: Cpu::csrrc })
+                }
+                0b101 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let uimm = (inst_bin >> 15) & 0x1f;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: uimm as usize, csr_addr, executor: Cpu::csrrwi })
+                }
+                0b110 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let uimm = (inst_bin >> 15) & 0x1f;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: uimm as usize, csr_addr, executor: Cpu::csrrsi })
+                }
+                0b111 => {
+                    let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                    let uimm = (inst_bin >> 15) & 0x1f;
+                    let csr_addr = (inst_bin >> 20) & 0xfff;
+                    Box::new(instruction::CSRType { inst_bin, rd, rs1_uimm: uimm as usize, csr_addr, executor: Cpu::csrrci })
+                }
+                _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
             },
-            _ => StepResult::Trap(2),
+            _ => Box::new(instruction::NoArgsType { inst_bin, executor: |_| StepResult::Trap(2) }),
         }
     }
 
-    fn execute16<B: bus::Bus>(&mut self, inst_bin: u16, quadrant: u16, bus: &mut B) -> StepResult {
+    fn decode16_to_obj(&self, inst_bin: u16, quadrant: u16) -> Box<dyn Instruction> {
         match quadrant {
             0b00 => match self.decode_c_funct3(inst_bin) {
-                0b000 => self.c_addi4spn(inst_bin),
-                0b010 => self.c_lw(inst_bin, bus),
-                0b110 => self.c_sw(inst_bin, bus),
-                _ => StepResult::Trap(2),
+                0b000 => {
+                    let (rd, imm) = self.decode_ciw_type(inst_bin);
+                    Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_addi4spn })
+                }
+                0b010 => {
+                    let (rd, rs1, imm) = self.decode_cl_type(inst_bin);
+                    Box::new(instruction::CTypeThreeBus { inst_bin, r1: rd, r2: rs1, imm, executor: |cpu, rd, rs1, imm, bus| cpu.c_lw(rd, rs1, imm, bus) })
+                }
+                0b110 => {
+                    let (rs1, rs2, imm) = self.decode_cs_type(inst_bin);
+                    Box::new(instruction::CTypeThreeBus { inst_bin, r1: rs1, r2: rs2, imm, executor: |cpu, rs1, rs2, imm, bus| cpu.c_sw(rs1, rs2, imm, bus) })
+                }
+                _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
             },
             0b01 => match self.decode_c_funct3(inst_bin) {
-                0b000 => self.c_addi(inst_bin),
-                0b001 => self.c_jal(inst_bin),
-                0b010 => self.c_li(inst_bin),
+                0b000 => {
+                    let (rd, imm) = self.decode_ci_type(inst_bin);
+                    if rd == 0 {
+                        // C.ADDI rd=0 is HINT
+                        Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_addi })
+                    } else {
+                        Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_addi })
+                    }
+                }
+                0b001 => {
+                    let imm = self.decode_cj_type(inst_bin);
+                    Box::new(instruction::CType { inst_bin, rd: 0, imm, executor: |cpu, _, imm| cpu.c_jal(imm) })
+                }
+                0b010 => {
+                    let (rd, imm) = self.decode_ci_type(inst_bin);
+                    if rd == 0 {
+                        Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
+                    } else {
+                        Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_li })
+                    }
+                }
                 0b011 => {
                     let rd = ((inst_bin >> 7) & 0x1f) as usize;
                     if rd == 2 {
-                        self.c_addi16sp(inst_bin)
+                        let imm = self.decode_c_addi16sp_imm(inst_bin);
+                        Box::new(instruction::CType { inst_bin, rd: 0, imm, executor: |cpu, _, imm| cpu.c_addi16sp(imm) })
+                    } else if rd == 0 {
+                        Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
                     } else {
-                        self.c_lui(inst_bin)
+                        let (rd, imm) = self.decode_ci_type(inst_bin);
+                        Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_lui })
                     }
                 }
                 0b100 => match self.decode_c_funct2(inst_bin) {
-                    0b00 => self.c_srli(inst_bin),
-                    0b01 => self.c_srai(inst_bin),
-                    0b10 => self.c_andi(inst_bin),
-                    0b11 => match self.decode_c_funct6(inst_bin) {
-                        0b100011 => match (inst_bin >> 5) & 0x3 {
-                            0b00 => self.c_sub(inst_bin),
-                            0b01 => self.c_xor(inst_bin),
-                            0b10 => self.c_or(inst_bin),
-                            0b11 => self.c_and(inst_bin),
-                            _ => StepResult::Trap(2),
-                        },
-                        _ => StepResult::Trap(2),
+                    0b00 => {
+                        let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
+                        if (inst_bin >> 12) & 0x1 != 0 {
+                            Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
+                        } else {
+                            Box::new(instruction::CType { inst_bin, rd, imm: shamt & 0x1f, executor: Cpu::c_srli })
+                        }
                     }
-                    _ => StepResult::Trap(2),
+                    0b01 => {
+                        let (rd, shamt) = self.decode_cb_shamt_type(inst_bin);
+                        if (inst_bin >> 12) & 0x1 != 0 {
+                            Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
+                        } else {
+                            Box::new(instruction::CType { inst_bin, rd, imm: shamt & 0x1f, executor: Cpu::c_srai })
+                        }
+                    }
+                    0b10 => {
+                        let (rd, imm) = self.decode_cb_andi_type(inst_bin);
+                        Box::new(instruction::CType { inst_bin, rd, imm, executor: Cpu::c_andi })
+                    }
+                    0b11 => match self.decode_c_funct6(inst_bin) {
+                        0b100011 => {
+                             let (rd, rs2) = self.decode_ca_type(inst_bin);
+                             match (inst_bin >> 5) & 0x3 {
+                                0b00 => Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_sub }),
+                                0b01 => Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_xor }),
+                                0b10 => Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_or }),
+                                0b11 => Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_and }),
+                                _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
+                            }
+                        }
+                        _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
+                    }
+                    _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
                 }
-                0b101 => self.c_j(inst_bin),
-                0b110 => self.c_beqz(inst_bin),
-                0b111 => self.c_bnez(inst_bin),
-                _ => StepResult::Trap(2),
+                0b101 => {
+                    let imm = self.decode_cj_type(inst_bin);
+                    Box::new(instruction::CType { inst_bin, rd: 0, imm, executor: |cpu, _, imm| cpu.c_j(imm) })
+                }
+                0b110 => {
+                    let (rs1, imm) = self.decode_cb_branch_type(inst_bin);
+                    Box::new(instruction::CTypeThree { inst_bin, r1: rs1, r2: 0, imm, executor: |cpu, rs1, _, imm| cpu.c_beqz(rs1, imm) })
+                }
+                0b111 => {
+                    let (rs1, imm) = self.decode_cb_branch_type(inst_bin);
+                    Box::new(instruction::CTypeThree { inst_bin, r1: rs1, r2: 0, imm, executor: |cpu, rs1, _, imm| cpu.c_bnez(rs1, imm) })
+                }
+                _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
             },
             0b10 => match self.decode_c_funct3(inst_bin) {
-                0b000 => self.c_slli(inst_bin),
-                0b010 => self.c_lwsp(inst_bin, bus),
+                0b000 => {
+                    let (rd, shamt) = self.decode_ci_shamt_type(inst_bin);
+                    if rd == 0 {
+                        Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
+                    } else if (inst_bin >> 12) & 0x1 != 0 {
+                        Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) })
+                    } else {
+                        Box::new(instruction::CType { inst_bin, rd, imm: shamt & 0x1f, executor: Cpu::c_slli })
+                    }
+                }
+                0b010 => {
+                    let (rd, imm) = self.decode_c_lwsp_type(inst_bin);
+                    Box::new(instruction::CTypeLoad { inst_bin, rd, imm, executor: Cpu::c_lwsp })
+                }
                 0b100 => {
-                    let rs2 = (inst_bin >> 2) & 0x1f;
+                    let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
                     match self.decode_c_funct4(inst_bin) {
                         0b1000 => {
                             if rs2 == 0 {
-                                self.c_jr(inst_bin)
+                                let rs1 = ((inst_bin >> 7) & 0x1f) as usize;
+                                Box::new(instruction::CTypeReg { inst_bin, reg: rs1, executor: Cpu::c_jr })
                             } else {
-                                self.c_mv(inst_bin)
+                                let rd = ((inst_bin >> 7) & 0x1f) as usize;
+                                Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_mv })
                             }
                         }
                         0b1001 => {
-                            let rd = (inst_bin >> 7) & 0x1f;
+                            let rd = ((inst_bin >> 7) & 0x1f) as usize;
                             if rd == 0 && rs2 == 0 {
-                                self.ebreak()
+                                Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: Cpu::ebreak })
                             } else if rs2 == 0 {
-                                self.c_jalr(inst_bin)
+                                Box::new(instruction::CTypeReg { inst_bin, reg: rd, executor: Cpu::c_jalr })
                             } else {
-                                self.c_add(inst_bin)
+                                Box::new(instruction::CTypeTwo { inst_bin, r1: rd, r2: rs2, executor: Cpu::c_add })
                             }
                         }
-                        _ => StepResult::Trap(2),
+                        _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
                     }
                 }
-                0b110 => self.c_swsp(inst_bin, bus),
-                _ => StepResult::Trap(2),
+                0b110 => {
+                    let (rs2, imm) = self.decode_c_swsp_type(inst_bin);
+                    Box::new(instruction::CTypeThreeBus { inst_bin, r1: rs2, r2: 0, imm, executor: |cpu, rs2, _, imm, bus| cpu.c_swsp(rs2, imm, bus) })
+                }
+                _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
             },
-            _ => StepResult::Trap(2),
+            _ => Box::new(instruction::NoArgsType { inst_bin: inst_bin as u32, executor: |_| StepResult::Trap(2) }),
         }
     }
 }

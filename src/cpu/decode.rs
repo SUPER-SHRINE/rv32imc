@@ -281,11 +281,6 @@ impl Cpu {
         (rs2, imm as u32)
     }
 
-    pub(super) fn decode_cr_type(&self, inst_bin: u16) -> (usize, usize) {
-        let rs1_rd = ((inst_bin >> 7) & 0x1f) as usize;
-        let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
-        (rs1_rd, rs2)
-    }
 
     pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
         inst_bin & 0x7f

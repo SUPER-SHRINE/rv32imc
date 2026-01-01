@@ -2,16 +2,14 @@ use crate::cpu::Cpu;
 use crate::cpu::StepResult;
 
 impl Cpu {
-    pub(crate) fn mul(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn mul(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2]);
         }
         StepResult::Ok
     }
 
-    pub(crate) fn mulh(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn mulh(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let src1 = self.regs[rs1] as i32 as i64;
             let src2 = self.regs[rs2] as i32 as i64;
@@ -21,8 +19,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn mulhsu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn mulhsu(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let src1 = self.regs[rs1] as i32 as i128;
             let src2 = self.regs[rs2] as u64 as i128;
@@ -32,8 +29,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn mulhu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn mulhu(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let src1 = self.regs[rs1] as u64;
             let src2 = self.regs[rs2] as u64;
@@ -43,8 +39,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn div(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn div(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let val1 = self.regs[rs1] as i32;
             let val2 = self.regs[rs2] as i32;
@@ -62,8 +57,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn divu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn divu(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let val1 = self.regs[rs1];
             let val2 = self.regs[rs2];
@@ -79,8 +73,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn rem(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn rem(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let val1 = self.regs[rs1] as i32;
             let val2 = self.regs[rs2] as i32;
@@ -98,8 +91,7 @@ impl Cpu {
         StepResult::Ok
     }
 
-    pub(crate) fn remu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    pub(crate) fn remu(&mut self, rd: usize, rs1: usize, rs2: usize) -> StepResult {
         if rd != 0 {
             let val1 = self.regs[rs1];
             let val2 = self.regs[rs2];

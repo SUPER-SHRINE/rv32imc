@@ -685,6 +685,7 @@ fn test_c_slli_hint_and_reserved() {
     // c.slli x0, 1 (Reserved)
     // inst: 000 0 00000 00001 10 -> 0x0006
     cpu.pc = 0x0;
+    cpu.clear_cache(); // Clear cache because we updated memory
     bus.write_inst16(0x0, 0x0006);
     let result = cpu.step(&mut bus);
     match result {
