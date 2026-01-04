@@ -40,7 +40,6 @@ impl Cpu {
         let imm = imm as u32;
         let addr = self.regs[2].wrapping_add(imm);
         bus.write32(addr, self.regs[rs2]);
-        self.flush_cache_line(addr);
         StepResult::Ok(2)
     }
 
@@ -72,7 +71,6 @@ impl Cpu {
         let imm = imm as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         bus.write32(addr, self.regs[rs2]);
-        self.flush_cache_line(addr);
         StepResult::Ok(2)
     }
 
