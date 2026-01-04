@@ -18,7 +18,7 @@ fn test_beq() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (0 << 12) | (0 << 7) | 0x63
     //      = 0x10208063
     let inst_bin = 0x10208063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 条件一致
     cpu.step(&mut bus);
@@ -45,7 +45,7 @@ fn test_beq_neg() {
     // inst = (1 << 31) | (0x38 << 25) | (2 << 20) | (1 << 15) | (0 << 12) | (1 << 7) | 0x63
     //      = 0xf02080e3
     let inst_bin = 0xf02080e3;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x0f00);
@@ -65,7 +65,7 @@ fn test_bne() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (1 << 12) | (0 << 7) | 0x63
     //      = 0x10209063
     let inst_bin = 0x10209063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 条件一致 (10 != 20)
     cpu.step(&mut bus);
@@ -93,7 +93,7 @@ fn test_blt() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (4 << 12) | (0 << 7) | 0x63
     //      = 0x1020c063
     let inst_bin = 0x1020c063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1100);
 
@@ -141,7 +141,7 @@ fn test_bge() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (5 << 12) | (0 << 7) | 0x63
     //      = 0x1020d063
     let inst_bin = 0x1020d063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1100);
 
@@ -189,7 +189,7 @@ fn test_bltu() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (6 << 12) | (0 << 7) | 0x63
     //      = 0x1020e063
     let inst_bin = 0x1020e063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1100);
 
@@ -238,7 +238,7 @@ fn test_bgeu() {
     // inst = (0 << 31) | (0x08 << 25) | (2 << 20) | (1 << 15) | (7 << 12) | (0 << 7) | 0x63
     //      = 0x1020f063
     let inst_bin = 0x1020f063;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1100);
 

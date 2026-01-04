@@ -16,7 +16,7 @@ fn test_add() {
     // add x3, x1, x2 (0x002081b3)
     // opcode: 0110011, rd: 3, funct3: 000, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x002081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 30);
@@ -34,7 +34,7 @@ fn test_add_negative() {
 
     // add x3, x1, x2 (0x002081b3)
     let inst = 0x002081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0);
@@ -53,7 +53,7 @@ fn test_sub() {
     // sub x3, x1, x2 (0x402081b3)
     // opcode: 0110011, rd: 3, funct3: 000, rs1: 1, rs2: 2, funct7: 0100000
     let inst = 0x402081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 20);
@@ -71,7 +71,7 @@ fn test_sub_negative_result() {
 
     // sub x3, x1, x2 (0x402081b3)
     let inst = 0x402081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffec); // -20
@@ -90,7 +90,7 @@ fn test_sll() {
     // sll x3, x1, x2 (0x002091b3)
     // opcode: 0110011, rd: 3, funct3: 001, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x002091b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1 << 5);
@@ -99,7 +99,7 @@ fn test_sll() {
     // テスト2: シフト量の下位5ビットのみが使用されることを確認
     // x1 = 0x00000001, x2 = 32 (0x20) -> shamt = 0
     cpu.regs[2] = 32;
-    bus.write_inst32(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x00000001);
 }
@@ -116,7 +116,7 @@ fn test_slt() {
     // slt x3, x1, x2 (0x0020a1b3)
     // opcode: 0110011, rd: 3, funct3: 010, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020a1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1);
@@ -125,21 +125,21 @@ fn test_slt() {
     // x1 = 20, x2 = 10 (x1 > x2)
     cpu.regs[1] = 20;
     cpu.regs[2] = 10;
-    bus.write_inst32(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0);
 
     // x1 = -10 (0xfffffff6), x2 = 10 (-10 < 10)
     cpu.regs[1] = 0xfffffff6;
     cpu.regs[2] = 10;
-    bus.write_inst32(0x8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1);
 
     // x1 = 10, x2 = -10 (10 > -10)
     cpu.regs[1] = 10;
     cpu.regs[2] = 0xfffffff6;
-    bus.write_inst32(0xc, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0xc, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0);
 }
@@ -156,7 +156,7 @@ fn test_and() {
     // and x3, x1, x2 (0x0020f1b3)
     // opcode: 0110011, rd: 3, funct3: 111, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020f1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0b1000);
@@ -175,7 +175,7 @@ fn test_sltu() {
     // sltu x3, x1, x2 (0x0020b1b3)
     // opcode: 0110011, rd: 3, funct3: 011, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020b1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1);
@@ -184,21 +184,21 @@ fn test_sltu() {
     // x1 = 20, x2 = 10 (x1 > x2)
     cpu.regs[1] = 20;
     cpu.regs[2] = 10;
-    bus.write_inst32(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0);
 
     // x1 = 0xffffffff, x2 = 10 (unsigned: 0xffffffff > 10)
     cpu.regs[1] = 0xffffffff;
     cpu.regs[2] = 10;
-    bus.write_inst32(0x8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0);
 
     // x1 = 10, x2 = 0xffffffff (unsigned: 10 < 0xffffffff)
     cpu.regs[1] = 10;
     cpu.regs[2] = 0xffffffff;
-    bus.write_inst32(0xc, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0xc, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 1);
 }
@@ -215,7 +215,7 @@ fn test_xor() {
     // xor x3, x1, x2 (0x0020c1b3)
     // opcode: 0110011, rd: 3, funct3: 100, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020c1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0b0110);
@@ -234,7 +234,7 @@ fn test_srl() {
     // srl x3, x1, x2 (0x0020d1b3)
     // opcode: 0110011, rd: 3, funct3: 101, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020d1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x40000000);
@@ -244,7 +244,7 @@ fn test_srl() {
     // x1 = 0x80000000, x2 = 33 (0x21) -> shamt = 1
     cpu.regs[1] = 0x80000000;
     cpu.regs[2] = 33;
-    bus.write_inst32(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x40000000);
 }
@@ -261,7 +261,7 @@ fn test_sra() {
     // sra x3, x1, x2 (0x4020d1b3)
     // opcode: 0110011, rd: 3, funct3: 101, rs1: 1, rs2: 2, funct7: 0100000
     let inst = 0x4020d1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xc0000000);
@@ -270,14 +270,14 @@ fn test_sra() {
     // テスト2: 正の数に対する算術シフト (0x40000000 >> 1 = 0x20000000)
     cpu.regs[1] = 0x40000000;
     cpu.regs[2] = 1;
-    bus.write_inst32(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x20000000);
 
     // テスト3: シフト量の下位5ビットのみが使用される
     cpu.regs[1] = 0x80000000;
     cpu.regs[2] = 33; // shamt = 1
-    bus.write_inst32(0x8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xc0000000);
 }
@@ -294,7 +294,7 @@ fn test_or() {
     // or x3, x1, x2 (0x0020e1b3)
     // opcode: 0110011, rd: 3, funct3: 110, rs1: 1, rs2: 2, funct7: 0000000
     let inst = 0x0020e1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0b1110);

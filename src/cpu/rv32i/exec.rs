@@ -3,360 +3,406 @@ use crate::cpu::privilege_mode::PrivilegeMode;
 use crate::cpu::StepResult;
 
 impl Cpu {
-    pub(crate) fn lui(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, imm) = self.decode_u_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = imm;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn lui(&mut self, rd: u8, imm: u32) -> StepResult {
+        let rd: usize = rd as usize;
+        self.regs[rd] = imm;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn auipc(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, imm) = self.decode_u_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.pc.wrapping_add(imm);
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn auipc(&mut self, rd: u8, imm: u32) -> StepResult {
+        let rd: usize = rd as usize;
+        self.regs[rd] = self.pc.wrapping_add(imm);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn jal(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, imm) = self.decode_j_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.pc.wrapping_add(4);
-        }
+    #[inline(always)]
+    pub(crate) fn jal(&mut self, rd: u8, imm: u32) -> StepResult {
+        let rd: usize = rd as usize;
+        self.regs[rd] = self.pc.wrapping_add(4);
         self.pc = self.pc.wrapping_add(imm);
         StepResult::Jumped
     }
 
-    pub(crate) fn jalr(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn jalr(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let t = self.pc.wrapping_add(4);
         let target = self.regs[rs1].wrapping_add(imm) & !1;
-        if rd != 0 {
-            self.regs[rd] = t;
-        }
+        self.regs[rd] = t;
         self.pc = target;
         StepResult::Jumped
     }
 
-    pub(crate) fn beq(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn beq(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if self.regs[rs1] == self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn bne(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn bne(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if self.regs[rs1] != self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn blt(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn blt(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn bge(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn bge(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if (self.regs[rs1] as i32) >= (self.regs[rs2] as i32) {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn bltu(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn bltu(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if self.regs[rs1] < self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn bgeu(&mut self, inst_bin: u32) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_b_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn bgeu(&mut self, rs1: u8, rs2: u8, imm: u16) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         if self.regs[rs1] >= self.regs[rs2] {
             self.pc = self.pc.wrapping_add(imm);
             StepResult::Jumped
         } else {
-            StepResult::Ok
+            StepResult::Ok(4)
         }
     }
 
-    pub(crate) fn lb<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn lb<B: crate::bus::Bus>(&mut self, rd: u8, rs1: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = bus.read8(addr) as i8 as i32 as u32;
-        if rd != 0 {
-            self.regs[rd] = val;
-        }
-        StepResult::Ok
+        self.regs[rd] = val;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn lh<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn lh<B: crate::bus::Bus>(&mut self, rd: u8, rs1: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = bus.read16(addr) as i16 as i32 as u32;
-        if rd != 0 {
-            self.regs[rd] = val;
-        }
-        StepResult::Ok
+        self.regs[rd] = val;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn lw<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn lw<B: crate::bus::Bus>(&mut self, rd: u8, rs1: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = bus.read32(addr);
-        if rd != 0 {
-            self.regs[rd] = val;
-        }
-        StepResult::Ok
+        self.regs[rd] = val;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn lbu<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn lbu<B: crate::bus::Bus>(&mut self, rd: u8, rs1: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = bus.read8(addr) as u32;
-        if rd != 0 {
-            self.regs[rd] = val;
-        }
-        StepResult::Ok
+        self.regs[rd] = val;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn lhu<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn lhu<B: crate::bus::Bus>(&mut self, rd: u8, rs1: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = bus.read16(addr) as u32;
-        if rd != 0 {
-            self.regs[rd] = val;
-        }
-        StepResult::Ok
+        self.regs[rd] = val;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sb<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_s_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn sb<B: crate::bus::Bus>(&mut self, rs1: u8, rs2: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xff) as u8;
         bus.write8(addr, val);
-        StepResult::Ok
+        self.flush_cache_line(addr);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sh<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_s_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn sh<B: crate::bus::Bus>(&mut self, rs1: u8, rs2: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = (self.regs[rs2] & 0xffff) as u16;
         bus.write16(addr, val);
-        StepResult::Ok
+        self.flush_cache_line(addr);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sw<B: crate::bus::Bus>(&mut self, inst_bin: u32, bus: &mut B) -> StepResult {
-        let (rs1, rs2, imm) = self.decode_s_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn sw<B: crate::bus::Bus>(&mut self, rs1: u8, rs2: u8, imm: u16, bus: &mut B) -> StepResult {
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32;
         let addr = self.regs[rs1].wrapping_add(imm);
         let val = self.regs[rs2];
         bus.write32(addr, val);
-        StepResult::Ok
+        self.flush_cache_line(addr);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn addi(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1].wrapping_add(imm);
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn addi(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32; // Sign extension
+        self.regs[rd] = self.regs[rs1].wrapping_add(imm);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn slti(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = if (self.regs[rs1] as i32) < (imm as i32) {
-                1
-            } else {
-                0
-            };
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn slti(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: i32   = imm as i16 as i32; // Sign extension
+        self.regs[rd] = if (self.regs[rs1] as i32) < imm {
+            1
+        } else {
+            0
+        };
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sltiu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = if self.regs[rs1] < imm { 1 } else { 0 };
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn sltiu(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32; // Sign extension
+        self.regs[rd] = if self.regs[rs1] < imm { 1 } else { 0 };
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn xori(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] ^ imm;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn xori(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32; // Sign extension
+        self.regs[rd] = self.regs[rs1] ^ imm;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn ori(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] | imm;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn ori(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32; // Sign extension
+        self.regs[rd] = self.regs[rs1] | imm;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn andi(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] & imm;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn andi(&mut self, rd: u8, rs1: u8, imm: u16) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let imm: u32   = (imm as i16 as i32) as u32; // Sign extension
+        self.regs[rd] = self.regs[rs1] & imm;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn slli(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if (imm & !0x1f) != 0 {
-            return StepResult::Trap(2);
-        }
-        let shamt = imm & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] << shamt;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn slli(&mut self, rd: u8, rs1: u8, shamt: u8) -> StepResult {
+        let rd:    usize = rd    as usize;
+        let rs1:   usize = rs1   as usize;
+        let shamt: u32   = shamt as u32;
+        self.regs[rd] = self.regs[rs1] << shamt;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn srli(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        if (imm & !0x1f) != 0 {
-            return StepResult::Trap(2);
-        }
-        let shamt = imm & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] >> shamt;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn srli(&mut self, rd: u8, rs1: u8, shamt: u8) -> StepResult {
+        let rd:    usize = rd    as usize;
+        let rs1:   usize = rs1   as usize;
+        let shamt: u32   = shamt as u32;
+        self.regs[rd] = self.regs[rs1] >> shamt;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn srai(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, imm) = self.decode_i_type(inst_bin);
-        // SRAI has bit 30 set (0x400 in imm[11:0]), but other bits in imm[11:5] should be 0
-        if (imm & !0x1f) != 0x400 {
-            return StepResult::Trap(2);
-        }
-        let shamt = imm & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn srai(&mut self, rd: u8, rs1: u8, shamt: u8) -> StepResult {
+        let rd:    usize = rd    as usize;
+        let rs1:   usize = rs1   as usize;
+        let shamt: u32   = shamt as u32;
+        self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn add(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]);
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn add(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sub(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]);
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn sub(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]);
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sll(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn sll(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
         let shamt = self.regs[rs2] & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] << shamt;
-        }
-        StepResult::Ok
+        self.regs[rd] = self.regs[rs1] << shamt;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn slt(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
-                1
-            } else {
-                0
-            };
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn slt(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
+            1
+        } else {
+            0
+        };
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sltu(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = if self.regs[rs1] < self.regs[rs2] { 1 } else { 0 };
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn sltu(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = if self.regs[rs1] < self.regs[rs2] { 1 } else { 0 };
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn xor(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn xor(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = self.regs[rs1] ^ self.regs[rs2];
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn srl(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn srl(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
         let shamt = self.regs[rs2] & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] >> shamt;
-        }
-        StepResult::Ok
+        self.regs[rd] = self.regs[rs1] >> shamt;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn sra(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
+    #[inline(always)]
+    pub(crate) fn sra(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
         let shamt = self.regs[rs2] & 0x1f;
-        if rd != 0 {
-            self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
-        }
-        StepResult::Ok
+        self.regs[rd] = (self.regs[rs1] as i32 >> shamt) as u32;
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn or(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] | self.regs[rs2];
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn or(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = self.regs[rs1] | self.regs[rs2];
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn and(&mut self, inst_bin: u32) -> StepResult {
-        let (rd, rs1, rs2) = self.decode_r_type(inst_bin);
-        if rd != 0 {
-            self.regs[rd] = self.regs[rs1] & self.regs[rs2];
-        }
-        StepResult::Ok
+    #[inline(always)]
+    pub(crate) fn and(&mut self, rd: u8, rs1: u8, rs2: u8) -> StepResult {
+        let rd:  usize = rd  as usize;
+        let rs1: usize = rs1 as usize;
+        let rs2: usize = rs2 as usize;
+        self.regs[rd] = self.regs[rs1] & self.regs[rs2];
+        StepResult::Ok(4)
     }
 
+    #[inline(always)]
     pub(crate) fn fence(&mut self) -> StepResult {
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
+    #[inline(always)]
     pub(crate) fn fence_i(&mut self) -> StepResult {
-        StepResult::Ok
+        for page in self.pages.iter_mut() {
+            *page = None;
+        }
+        self.current_page_num = 0xffffffff;
+        StepResult::Ok(4)
     }
 
+    #[inline(always)]
     pub(crate) fn ecall(&mut self) -> StepResult {
         let code = match self.mode {
             PrivilegeMode::User => 8,
@@ -366,10 +412,12 @@ impl Cpu {
         StepResult::Trap(code)
     }
 
+    #[inline(always)]
     pub(crate) fn ebreak(&mut self) -> StepResult {
         StepResult::Trap(3) // Breakpoint exception code is 3
     }
 
+    #[inline(always)]
     pub(crate) fn mret(&mut self) -> StepResult {
         // mret は Machine モードでのみ実行可能
         // ただし、riscv-tests の中には特権レベルが Machine でないときに mret を実行して

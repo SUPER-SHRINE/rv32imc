@@ -147,6 +147,46 @@ fn test_timer_interrupt() {
 }
 
 #[test]
+fn test_timer_interrupt_after_csr_op() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = InterruptTestBus::new();
+
+    // 1. 割り込みを有効化する
+    // mstatus.MIE = 1, mie.MTIE = 1, mtvec = 0x200
+    let _ = cpu.csr.write(0x300, 1 << 3);
+    let _ = cpu.csr.write(0x304, 1 << 7);
+    let _ = cpu.csr.write(0x305, 0x200);
+
+    // CSR 命令を配置 (CSRRW x0, mscratch, x1) -> rd=0 なので読み出さないはず
+    // mscratch(0x340) に値を書いておき、x1(初期値0) で上書きする
+    let _ = cpu.csr.write(0x340, 0xdeadbeef);
+    cpu.regs[1] = 0x12345678;
+    // 0x00000013 は ADDI x0, x0, 0 (NOP)
+    // 0x34001073 は csrrw x0, mscratch, x1
+    bus.mock_bus.write_inst32(0, 0x34009073); 
+
+    // 2. タイマー割り込みを発生させる
+    bus.timer_interrupt = true;
+
+    // 3. 実行
+    // このステップで CSRRW が実行され、割り込みチェックが行われるはず
+    // 割り込みは命令実行の直前にチェックされるので、最初の step で Trap になる
+    let result = cpu.step(&mut bus);
+
+    // 4. 検証
+    assert!(matches!(result, StepResult::Trap(0x8000_0007)));
+    
+    // 5. 割り込み処理から戻った後にもう一度 CSR 操作をしてみる
+    cpu.pc = 0x0;
+    cpu.csr.mstatus |= 1 << 3; // MIE を戻す
+    bus.timer_interrupt = false;
+    
+    // rd=0 の CSRRW を実行 (読み出し副作用がないことを期待)
+    let _ = cpu.step(&mut bus); 
+    assert_eq!(cpu.csr.read(0x340).unwrap(), 0x12345678);
+}
+
+#[test]
 fn test_interrupt_priority() {
     let mut cpu = Cpu::new(0x0);
     let mut bus = InterruptTestBus::new();
@@ -247,7 +287,7 @@ fn test_interrupt_disabled_by_mstatus() {
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず
-    assert!(matches!(result, StepResult::Ok));
+    assert!(matches!(result, StepResult::Ok(4)));
     assert_eq!(cpu.pc, 4);
 }
 
@@ -269,6 +309,6 @@ fn test_interrupt_disabled_by_mie() {
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず
-    assert!(matches!(result, StepResult::Ok));
+    assert!(matches!(result, StepResult::Ok(4)));
     assert_eq!(cpu.pc, 4);
 }

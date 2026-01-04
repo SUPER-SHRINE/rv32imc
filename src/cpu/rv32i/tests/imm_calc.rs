@@ -14,7 +14,8 @@ fn test_addi() {
     // 000000001010 00000 000 00001 0010011
     // 0x00a00093
     let inst = 0x00a00093;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
+    cpu.flush_cache_line(0);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 10);
     assert_eq!(cpu.pc, 4);
@@ -24,14 +25,16 @@ fn test_addi() {
     // 111111111011 00001 000 00010 0010011
     // 0xffb08113
     let inst = 0xffb08113;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
+    cpu.flush_cache_line(4);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 5);
     assert_eq!(cpu.pc, 8);
 
     // ADDI x0, x1, 10 (x0 is always 0)
     let inst = 0x00a08013;
-    bus.write_inst32(8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(8, inst);
+    cpu.flush_cache_line(8);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[0], 0);
     assert_eq!(cpu.pc, 12);
@@ -47,7 +50,8 @@ fn test_slti() {
     // 000000001010 00000 010 00001 0010011
     // 0x00a02093
     let inst = 0x00a02093;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
+    cpu.flush_cache_line(0);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 1);
     assert_eq!(cpu.pc, 4);
@@ -57,7 +61,8 @@ fn test_slti() {
     // 111111110110 00000 010 00010 0010011
     // 0xff602113
     let inst = 0xff602113;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
+    cpu.flush_cache_line(4);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0);
     assert_eq!(cpu.pc, 8);
@@ -68,7 +73,8 @@ fn test_slti() {
     // 111111110110 00011 010 00100 0010011
     // 0xff61a213
     let inst = 0xff61a213;
-    bus.write_inst32(8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(8, inst);
+    cpu.flush_cache_line(8);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[4], 1);
     assert_eq!(cpu.pc, 12);
@@ -78,7 +84,8 @@ fn test_slti() {
     // 111111100010 00011 010 00101 0010011
     // 0xfe21a293
     let inst = 0xfe21a293;
-    bus.write_inst32(12, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(12, inst);
+    cpu.flush_cache_line(12);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[5], 0);
     assert_eq!(cpu.pc, 16);
@@ -94,7 +101,8 @@ fn test_sltiu() {
     // 000000001010 00000 011 00001 0010011
     // 0x00a03093
     let inst = 0x00a03093;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
+    cpu.flush_cache_line(0);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 1);
     assert_eq!(cpu.pc, 4);
@@ -104,7 +112,8 @@ fn test_sltiu() {
     // 111111111111 00000 011 00010 0010011
     // 0xfff03113
     let inst = 0xfff03113;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
+    cpu.flush_cache_line(4);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 1);
     assert_eq!(cpu.pc, 8);
@@ -115,7 +124,7 @@ fn test_sltiu() {
     // 000000001010 00011 011 00100 0010011
     // 0x00a1b213
     let inst = 0x00a1b213;
-    bus.write_inst32(8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[4], 0);
     assert_eq!(cpu.pc, 12);
@@ -127,7 +136,7 @@ fn test_sltiu() {
     // 111111111111 00101 011 00110 0010011
     // 0xfff2b313
     let inst = 0xfff2b313;
-    bus.write_inst32(12, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(12, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[6], 1);
     assert_eq!(cpu.pc, 16);
@@ -145,7 +154,7 @@ fn test_xori() {
     // 010101010101 00001 100 00010 0010011
     // 0x5550c113
     let inst = 0x5550c113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0xAAAA_AAAA ^ 0x0000_0555);
     assert_eq!(cpu.pc, 4);
@@ -155,7 +164,7 @@ fn test_xori() {
     // 111111111111 00001 100 00011 0010011
     // 0xfff0c193
     let inst = 0xfff0c193;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x5555_5555);
     assert_eq!(cpu.pc, 8);
@@ -173,7 +182,7 @@ fn test_ori() {
     // 010101010101 00001 110 00010 0010011
     // 0x5550e113
     let inst = 0x5550e113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0xAAAA_5555 | 0x0000_0555);
     assert_eq!(cpu.pc, 4);
@@ -183,7 +192,7 @@ fn test_ori() {
     // 111111111111 00001 110 00011 0010011
     // 0xfff0e193
     let inst = 0xfff0e193;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffff_ffff);
     assert_eq!(cpu.pc, 8);
@@ -201,7 +210,7 @@ fn test_andi() {
     // 010101010101 00001 111 00010 0010011
     // 0x5550f113
     let inst = 0x5550f113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0xAAAA_5555 & 0x0000_0555);
     assert_eq!(cpu.pc, 4);
@@ -211,7 +220,7 @@ fn test_andi() {
     // 111111111111 00001 111 00011 0010011
     // 0xfff0f193
     let inst = 0xfff0f193;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xAAAA_5555);
     assert_eq!(cpu.pc, 8);
@@ -229,7 +238,7 @@ fn test_slli() {
     // 0000000 00001 00001 001 00010 0010011
     // 0x00109113
     let inst = 0x00109113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0x0000_0002);
     assert_eq!(cpu.pc, 4);
@@ -240,7 +249,7 @@ fn test_slli() {
     // 0000000 00001 00011 001 00100 0010011
     // 0x00119213
     let inst = 0x00119213;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[4], 0x0000_0000);
     assert_eq!(cpu.pc, 8);
@@ -252,7 +261,7 @@ fn test_slli() {
     // 0000000 11000 00101 001 00110 0010011
     // 0x01829313
     let inst = 0x01829313;
-    bus.write_inst32(8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[6], 0xFF00_0000);
     assert_eq!(cpu.pc, 12);
@@ -270,7 +279,7 @@ fn test_srli() {
     // 0000000 00001 00001 101 00010 0010011
     // 0x0010d113
     let inst = 0x0010d113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0x4000_0000);
     assert_eq!(cpu.pc, 4);
@@ -282,7 +291,7 @@ fn test_srli() {
     // 0000000 01000 00011 101 00100 0010011
     // 0x0081d213
     let inst = 0x0081d213;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[4], 0x00FF_FFFF);
     assert_eq!(cpu.pc, 8);
@@ -300,7 +309,7 @@ fn test_srai() {
     // 0100000 00001 00001 101 00010 0010011
     // 0x4010d113
     let inst = 0x4010d113;
-    bus.write_inst32(0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0xC000_0000);
     assert_eq!(cpu.pc, 4);
@@ -311,7 +320,7 @@ fn test_srai() {
     // 0100000 00001 00011 101 00100 0010011
     // 0x4011d213
     let inst = 0x4011d213;
-    bus.write_inst32(4, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(4, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[4], 0x0000_0000);
     assert_eq!(cpu.pc, 8);
@@ -323,7 +332,7 @@ fn test_srai() {
     // 0100000 01000 00101 101 00110 0010011
     // 0x4082d313
     let inst = 0x4082d313;
-    bus.write_inst32(8, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(8, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[6], 0xFFFF_FFFF);
     assert_eq!(cpu.pc, 12);

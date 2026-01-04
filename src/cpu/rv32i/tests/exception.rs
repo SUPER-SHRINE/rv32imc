@@ -17,7 +17,7 @@ fn test_ecall_user() {
 
     // ECALL instruction
     let inst = 0x00000073;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -40,7 +40,7 @@ fn test_ecall_machine() {
 
     // ECALL instruction
     let inst = 0x00000073;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -59,7 +59,7 @@ fn test_ebreak() {
 
     // EBREAK instruction
     let inst = 0x00100073;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -79,7 +79,7 @@ fn test_mret() {
 
     // MRET instruction
     let inst = 0x30200073;
-    bus.write_inst32(0x0200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0200, inst);
 
     cpu.step(&mut bus);
 
@@ -98,7 +98,7 @@ fn test_ecall_mret_flow() {
     cpu.csr.mstatus = 0b1000; // MIE = 1
 
     // 1. ECALL at 0x0100
-    bus.write_inst32(0x0100, 0x00000073);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, 0x00000073);
     cpu.step(&mut bus);
     
     assert_eq!(cpu.pc, 0x0200);
@@ -107,10 +107,25 @@ fn test_ecall_mret_flow() {
 
     // 2. In handler, increment mepc (to skip ecall) and then MRET
     cpu.csr.mepc += 4;
-    bus.write_inst32(0x0200, 0x30200073); // MRET
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0200, 0x30200073); // MRET
     cpu.step(&mut bus);
 
     assert_eq!(cpu.pc, 0x0104);
     assert_eq!(cpu.mode, PrivilegeMode::User);
     assert_eq!((cpu.csr.mstatus >> 3) & 1, 1); // MIE restored to 1
+}
+
+#[test]
+fn test_wfi() {
+    let mut cpu = Cpu::new(0x0100);
+    let mut bus = MockBus::new();
+
+    // WFI instruction (0x10500073)
+    let inst = 0x10500073;
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
+
+    let result = cpu.step(&mut bus);
+
+    assert!(matches!(result, crate::cpu::StepResult::Ok(4)));
+    assert_eq!(cpu.pc, 0x0104);
 }

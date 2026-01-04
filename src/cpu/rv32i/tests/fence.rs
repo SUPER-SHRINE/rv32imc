@@ -15,7 +15,7 @@ fn test_fence() {
     // pred: 1000 (W), succ: 0100 (R)
     // 0x0840000f
     let inst = 0x0840000f;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
 
@@ -32,7 +32,7 @@ fn test_fence_i() {
     // 000000000000 00000 001 00000 0001111
     // 0x0000100f
     let inst = 0x0000100f;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
 

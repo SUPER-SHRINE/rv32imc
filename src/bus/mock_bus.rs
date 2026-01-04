@@ -3,14 +3,14 @@ pub(crate) use crate::bus::Bus;
 // テストコードでのみ使用している構造体のため通常ビルド時に未使用の警告が出る(邪魔なので握り潰す)
 #[allow(unused)]
 pub(crate) struct MockBus {
-    memory: [u8; 8192],
+    memory: [u8; 131072],
 }
 
 impl MockBus {
     #[allow(unused)]
     pub(crate) fn new() -> Self {
         Self {
-            memory: [0; 8192],
+            memory: [0; 131072],
         }
     }
 
@@ -22,6 +22,11 @@ impl MockBus {
     #[allow(unused)]
     pub(crate) fn write_inst16(&mut self, addr: u32, inst: u16) {
         self.write16(addr, inst);
+    }
+
+    #[allow(unused)]
+    pub(crate) fn clear(&mut self) {
+        self.memory = [0; 131072];
     }
 }
 
