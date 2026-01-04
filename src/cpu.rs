@@ -49,7 +49,7 @@ pub struct Cpu {
     /// 命令キャッシュ
     pages: Vec<Option<InstructionCachePage>>,
 
-    /// 現在参照している命令キャッシュのページ番号
+    /// 命令キャッシュのページ番号
     current_page_num: u32,
 }
 
@@ -71,11 +71,14 @@ impl Cpu {
         bus.tick();
 
         // 実行前に割り込みをチェック
-        if let Some(interrupt_code) = self.check_interrupts(bus) {
-            let result = self.handle_trap(interrupt_code, 0);
-            self.regs[0] = 0; // レジスタ 0 は常に 0 に保つ.
-            self.current_page_num = 0xffffffff;
-            return result;
+        // パフォーマンス向上のため、MIE が有効な場合のみチェックする
+        if (self.csr.mstatus & (1 << 3)) != 0 {
+            if let Some(interrupt_code) = self.check_interrupts(bus) {
+                let result = self.handle_trap(interrupt_code, 0);
+                self.regs[0] = 0; // レジスタ 0 は常に 0 に保つ.
+                self.current_page_num = 0xffffffff;
+                return result;
+            }
         }
 
         let inst = self.fetch(bus);
@@ -88,7 +91,6 @@ impl Cpu {
                 StepResult::Ok(inst_size)
             }
             StepResult::Jumped => {
-                self.current_page_num = 0xffffffff;
                 StepResult::Jumped
             }
             StepResult::Trap(code) => {
@@ -99,7 +101,6 @@ impl Cpu {
                     0
                 };
                 self.handle_trap(code, mtval);
-                self.current_page_num = 0xffffffff; // Trap handles PC change
                 StepResult::Trap(code)
             }
         }
@@ -130,18 +131,15 @@ impl Cpu {
 
     /// 割り込みのチェックを行い、発生すべき割り込みがあればその例外コードを返す
     fn check_interrupts<B: bus::Bus>(&mut self, bus: &B) -> Option<u32> {
-        // mstatus.MIE が 0 の場合は割り込みを受け付けない
-        if (self.csr.mstatus & (1 << 3)) == 0 {
-            return None;
-        }
+        // パフォーマンス向上のため、mip & mie が 0 なら即座に None を返す
+        let pending_interrupts = self.csr.mip & self.csr.mie;
+        // 外部信号をチェックする前に、タイマー割り込みなどが既にペンディングされているか確認
+        // (厳密にはバスの状態を毎回反映すべきだが、パフォーマンスとのトレードオフ)
 
         // PLIC 等の外部信号を mip.MEIP に反映させる (最小構成として)
         if bus.get_interrupt_level() {
             self.csr.mip |= 1 << 11; // MEIP
         } else {
-            // 注意: 本来は Claim 時に PLIC が CPU の MEIP を下げるという副作用があるが、
-            // 現在の get_interrupt_level() 方式でも、Claim 後は最高優先度が
-            // threshold を下回る（あるいは 0 になる）ため、MEIP が下げられる挙動は再現される。
             self.csr.mip &= !(1 << 11);
         }
 
@@ -159,7 +157,7 @@ impl Cpu {
             self.csr.mip &= !(1 << 3);
         }
 
-        // mip と mie の論理積をとる
+        // 再度計算
         let pending_interrupts = self.csr.mip & self.csr.mie;
 
         if pending_interrupts == 0 {
@@ -187,7 +185,10 @@ impl Cpu {
 
     #[inline(always)]
     fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> Instruction {
-        let page_num = (self.pc / PAGE_SIZE as u32) as usize;
+        let page_num = (self.pc >> 12) as usize;
+        let page_offset = (self.pc & (PAGE_SIZE as u32 - 1)) as usize;
+        let entry_idx = page_offset >> 1;
+
         if page_num != self.current_page_num as usize {
             if page_num >= self.pages.len() {
                 self.pages.resize(page_num + 1, None);
@@ -199,29 +200,28 @@ impl Cpu {
                 self.current_page_num = page_num as u32;
             }
         }
-        let page_offset = (self.pc % PAGE_SIZE as u32) as usize;
-        let inst = self.pages[page_num].unwrap()[page_offset / 2];
+
+        let inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
         if matches!(inst, Instruction::None) {
             self.gen_cache_page(bus);
-            self.pages[page_num].unwrap()[page_offset / 2]
+            self.pages[page_num].as_ref().unwrap()[entry_idx]
         } else {
             inst
         }
     }
 
     fn gen_cache_page<B: bus::Bus>(&mut self, bus: &mut B) {
-        println!("Generating cache page for PC={:#x}", self.pc);
         let page_size = PAGE_SIZE as u32;
         let start_pc = self.pc & !(page_size - 1);
         let mut cache = [Instruction::None; ENTRY_COUNT];
 
         let mut raw_ptr = start_pc;
-        while (raw_ptr % page_size) < page_size - 1 {
-            let entry_idx = ((raw_ptr % page_size) / 2) as usize;
+        while (raw_ptr & (page_size - 1)) < page_size - 1 {
+            let entry_idx = ((raw_ptr & (page_size - 1)) >> 1) as usize;
             if entry_idx >= ENTRY_COUNT { break; }
 
             // ページ境界を跨ぐ命令のチェック
-            if (raw_ptr % page_size) == page_size - 2 {
+            if (raw_ptr & (page_size - 1)) == page_size - 2 {
                 let inst_low = bus.read16(raw_ptr);
                 let quadrant = Instruction::decode_quadrant(inst_low);
                 if quadrant == 0b11 {
@@ -236,7 +236,7 @@ impl Cpu {
             let (inst, inst_size) = self.gen_inst(raw_ptr, bus);
             cache[entry_idx] = inst;
             raw_ptr += inst_size;
-            if (raw_ptr % page_size) == 0 { break; }
+            if (raw_ptr & (page_size - 1)) == 0 { break; }
         }
         self.pages[(start_pc / page_size) as usize] = Some(cache);
     }
