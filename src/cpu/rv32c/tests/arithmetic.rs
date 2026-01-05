@@ -158,7 +158,7 @@ fn test_c_li_reserved() {
     let inst = 0x4029;
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     
     // HINT instruction (rd=x0) should be treated as NOP (Ok(2))
     assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
@@ -244,7 +244,7 @@ fn test_c_addi16sp_reserved() {
     let inst = 0x6101;
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap"),
@@ -294,7 +294,7 @@ fn test_c_lui_reserved() {
     let inst = 0x6005;
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     // HINT instruction (rd=x0) should be treated as NOP (Ok(2))
     assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
     assert_eq!(cpu.pc, 0x2);
@@ -354,7 +354,7 @@ fn test_c_srli_hint_and_reserved() {
     // c.srli x8, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 100 1 00 000 00000 01 -> 0x9001
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x9001);
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
@@ -416,7 +416,7 @@ fn test_c_srai_hint_and_reserved() {
     // c.srai x8, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 100 1 01 000 00000 01 -> 0x9401
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x9401);
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
@@ -671,7 +671,7 @@ fn test_c_slli_hint_and_reserved() {
     // c.slli x1, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 000 1 00001 00000 10 -> 0x1082
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x1082);
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
@@ -682,7 +682,7 @@ fn test_c_slli_hint_and_reserved() {
     // inst: 000 0 00000 00001 10 -> 0x0006
     cpu.pc = 0x0;
     cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, 0x0006);
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
     assert_eq!(cpu.pc, 0x2);
     assert_eq!(cpu.regs[0], 0);

@@ -96,7 +96,7 @@ fn test_external_interrupt() {
     bus.plic.set_interrupt(1);  // ID 1 を保留中に
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証
     // トラップが発生しているはず (Machine External Interrupt = 0x8000000b)
@@ -138,7 +138,7 @@ fn test_timer_interrupt() {
     bus.timer_interrupt = true;
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証
     assert!(matches!(result, StepResult::Trap(0x8000_0007)));
@@ -171,7 +171,7 @@ fn test_timer_interrupt_after_csr_op() {
     // 3. 実行
     // このステップで CSRRW が実行され、割り込みチェックが行われるはず
     // 割り込みは命令実行の直前にチェックされるので、最初の step で Trap になる
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証
     assert!(matches!(result, StepResult::Trap(0x8000_0007)));
@@ -205,7 +205,7 @@ fn test_interrupt_priority() {
     bus.plic.set_interrupt(1);
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証: 外部割り込みが優先されるはず
     assert!(matches!(result, StepResult::Trap(0x8000_000b)));
@@ -243,7 +243,7 @@ fn test_full_interrupt_handler_flow() {
 
     // 3. 実行
     // 1ステップ目: 割り込み検知 -> トラップハンドラへジャンプ
-    let result1 = cpu.step(&mut bus);
+    let (result1, _) = cpu.step(&mut bus);
     assert!(matches!(result1, StepResult::Trap(0x8000_000b)));
     assert_eq!(cpu.pc, 0x100);
 
@@ -260,7 +260,7 @@ fn test_full_interrupt_handler_flow() {
     // PLIC 信号をクリアしておく（そうしないと再度割り込みが発生する）
     bus.plic.clear_interrupt(1);
 
-    let result_mret = cpu.step(&mut bus); // mret
+    let (result_mret, _) = cpu.step(&mut bus); // mret
     assert!(matches!(result_mret, StepResult::Jumped));
     assert_eq!(cpu.pc, 0x0); // mepc (0) に戻るはず
 
@@ -283,7 +283,7 @@ fn test_interrupt_disabled_by_mstatus() {
     bus.plic.set_interrupt(1);
 
     // 2. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず
@@ -305,7 +305,7 @@ fn test_interrupt_disabled_by_mie() {
     bus.plic.set_interrupt(1);
 
     // 2. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず

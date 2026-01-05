@@ -15,7 +15,7 @@ fn test_c_ebreak() {
     // C.EBREAK: 1001 00000 00000 10 -> 0x9002
     bus.write16(0, 0x9002);
     
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     
     match result {
         StepResult::Trap(cause) => assert_eq!(cause, 3), // Breakpoint exception

@@ -124,7 +124,7 @@ fn test_wfi() {
     let inst = 0x10500073;
     cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     assert!(matches!(result, crate::cpu::StepResult::Ok(4)));
     assert_eq!(cpu.pc, 0x0104);

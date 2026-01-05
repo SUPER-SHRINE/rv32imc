@@ -66,7 +66,10 @@ impl Cpu {
     }
 
     /// 1ステップ実行
-    pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> StepResult {
+    pub fn step<B: bus::Bus>(&mut self, bus: &mut B) -> (StepResult, u32) {
+        let mut clock = 0;
+        let mut result: StepResult = StepResult::Ok(0);
+
         // クロックを進める
         bus.tick();
 
@@ -74,25 +77,50 @@ impl Cpu {
         // パフォーマンス向上のため、MIE が有効な場合のみチェックする
         if (self.csr.mstatus & (1 << 3)) != 0 {
             if let Some(interrupt_code) = self.check_interrupts(bus) {
-                let result = self.handle_trap(interrupt_code, 0);
+                result = self.handle_trap(interrupt_code, 0);
                 self.regs[0] = 0; // レジスタ 0 は常に 0 に保つ.
                 self.current_page_num = 0xffffffff;
-                return result;
+                return (result, clock);
             }
         }
 
-        let inst = self.fetch(bus);
-        let result = self.exec(inst, bus);
-        self.regs[0] = 0; // レジスタ 0 は常に 0 に保つ.
+        let page_num = (self.pc >> 12) as usize;
+        if page_num != self.current_page_num as usize {
+            if page_num >= self.pages.len() {
+                self.pages.resize(page_num + 1, None);
+            }
+            if self.pages[page_num].is_none() {
+                self.current_page_num = page_num as u32;
+                self.gen_cache_page(bus);
+            } else {
+                self.current_page_num = page_num as u32;
+            }
+        }
+
+        let max_page_num = (self.pc | 0xfff) as u32;
+        while self.pc <= max_page_num {
+            let page_offset = (self.pc & (PAGE_SIZE as u32 - 1)) as usize;
+            let entry_idx = page_offset >> 1;
+            let mut inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
+
+            if matches!(inst, Instruction::None) {
+                self.gen_cache_page(bus);
+                inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
+            }
+
+            result = self.exec(inst, bus);
+            self.regs[0] = 0; // レジスタ 0 は常に 0 に保つ.
+            clock += 1;
+            match result { 
+                StepResult::Ok(inst_size) => self.pc += inst_size,
+                _ => break,
+            }
+            // テスト時は 1 命令ずつ実行するように制限 (バスの状態が変わる可能性があるため)
+            #[cfg(test)]
+            { break; }
+        }
 
         match result {
-            StepResult::Ok(inst_size) => {
-                self.pc += inst_size;
-                StepResult::Ok(inst_size)
-            }
-            StepResult::Jumped => {
-                StepResult::Jumped
-            }
             StepResult::Trap(code) => {
                 let mtval = if code == 2 {
                     // 違法命令の場合、現在 pc が指している命令を mtval に格納
@@ -100,9 +128,10 @@ impl Cpu {
                 } else {
                     0
                 };
-                self.handle_trap(code, mtval);
-                StepResult::Trap(code)
-            }
+                result = self.handle_trap(code, mtval);
+                (result, clock)
+            },
+            _ => (result, clock)
         }
     }
 
@@ -131,8 +160,6 @@ impl Cpu {
 
     /// 割り込みのチェックを行い、発生すべき割り込みがあればその例外コードを返す
     fn check_interrupts<B: bus::Bus>(&mut self, bus: &B) -> Option<u32> {
-        // パフォーマンス向上のため、mip & mie が 0 なら即座に None を返す
-        let pending_interrupts = self.csr.mip & self.csr.mie;
         // 外部信号をチェックする前に、タイマー割り込みなどが既にペンディングされているか確認
         // (厳密にはバスの状態を毎回反映すべきだが、パフォーマンスとのトレードオフ)
 
@@ -157,7 +184,7 @@ impl Cpu {
             self.csr.mip &= !(1 << 3);
         }
 
-        // 再度計算
+        // 発生している有効な割り込みを計算
         let pending_interrupts = self.csr.mip & self.csr.mie;
 
         if pending_interrupts == 0 {
@@ -183,32 +210,6 @@ impl Cpu {
         None
     }
 
-    #[inline(always)]
-    fn fetch<B: bus::Bus>(&mut self, bus: &mut B) -> Instruction {
-        let page_num = (self.pc >> 12) as usize;
-        let page_offset = (self.pc & (PAGE_SIZE as u32 - 1)) as usize;
-        let entry_idx = page_offset >> 1;
-
-        if page_num != self.current_page_num as usize {
-            if page_num >= self.pages.len() {
-                self.pages.resize(page_num + 1, None);
-            }
-            if self.pages[page_num].is_none() {
-                self.current_page_num = page_num as u32;
-                self.gen_cache_page(bus);
-            } else {
-                self.current_page_num = page_num as u32;
-            }
-        }
-
-        let inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
-        if matches!(inst, Instruction::None) {
-            self.gen_cache_page(bus);
-            self.pages[page_num].as_ref().unwrap()[entry_idx]
-        } else {
-            inst
-        }
-    }
 
     fn gen_cache_page<B: bus::Bus>(&mut self, bus: &mut B) {
         let page_size = PAGE_SIZE as u32;
@@ -223,6 +224,10 @@ impl Cpu {
             // ページ境界を跨ぐ命令のチェック
             if (raw_ptr & (page_size - 1)) == page_size - 2 {
                 let inst_low = bus.read16(raw_ptr);
+                if inst_low == 0 {
+                    cache[entry_idx] = Instruction::Illegal;
+                    break;
+                }
                 let quadrant = Instruction::decode_quadrant(inst_low);
                 if quadrant == 0b11 {
                     let inst_high = bus.read16(raw_ptr + 2);
@@ -231,6 +236,14 @@ impl Cpu {
                     cache[entry_idx] = inst;
                     break;
                 }
+            }
+
+            let inst_bin16 = bus.read16(raw_ptr);
+            if inst_bin16 == 0 {
+                cache[entry_idx] = Instruction::Illegal;
+                raw_ptr += 2;
+                if (raw_ptr & (page_size - 1)) == 0 { break; }
+                continue;
             }
 
             let (inst, inst_size) = self.gen_inst(raw_ptr, bus);
