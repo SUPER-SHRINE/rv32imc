@@ -26,31 +26,54 @@ impl Csr {
     pub fn read(&self, addr: u32) -> Result<u32, ()> {
         match addr {
             0x300 => Ok(self.mstatus),
+            0x180 => Ok(self.satp),
+            0x301 => Ok(0x40101104), // misa: RV32IMCU
             0x305 => Ok(self.mtvec),
             0x304 => Ok(self.mie),
+            0x340 => Ok(self.mscratch),
             0x341 => Ok(self.mepc),
             0x342 => Ok(self.mcause),
             0x343 => Ok(self.mtval),
             0x344 => Ok(self.mip),
+            0x3a0 => Ok(self.pmpcfg0),
+            0x3b0..=0x3b3 => Ok(self.pmpaddr[(addr - 0x3b0) as usize]),
             // ... 他の CSR
             _ => Err(()),
         }
     }
 
     pub fn write(&mut self, addr: u32, val: u32) -> Result<(), ()> {
+        // 読み取り専用 CSR (bits 11-10 == 11) への書き込みは不正命令
+        if (addr >> 10) & 0b11 == 0b11 {
+            return Err(());
+        }
+
         match addr {
             0x300 => {
                 // mstatus の更新ロジック (MPP 等のバリデーション含む)
-                // ...
+                let mask = 0x807E1888 | 0x0000000F;
+                let mut val = val;
+                let mpp = (val >> 11) & 0b11;
+                if mpp == 1 || mpp == 2 {
+                    // S/Hモードは未サポートのためUserモードに丸める
+                    val &= !(0b11 << 11);
+                }
+                self.mstatus = (self.mstatus & !mask) | (val & mask);
                 Ok(())
             }
+            0x180 => { self.satp = val; Ok(()) }
             0x305 => { self.mtvec = val; Ok(()) }
             0x304 => { self.mie = val; Ok(()) }
+            0x340 => { self.mscratch = val; Ok(()) }
             0x341 => { self.mepc = val; Ok(()) }
             0x342 => { self.mcause = val; Ok(()) }
             0x343 => { self.mtval = val; Ok(()) }
             0x344 => { self.mip = val; Ok(()) }
-            // ... 他の CSR
+            0x3a0 => { self.pmpcfg0 = val; Ok(()) }
+            0x3b0..=0x3b3 => {
+                self.pmpaddr[(addr - 0x3b0) as usize] = val;
+                Ok(())
+            }
             _ => Err(()),
         }
     }
@@ -72,13 +95,15 @@ CSR 命令は以下の共通したステップで処理します。
     - `mstatus`, `mtvec`, `mie`, `mepc`, `mcause`, `mtval`, `mip` 等が対象となります。
     - ただし、`CSRRS`/`CSRRC` で `rs1` が `x0` の場合、読み出しのみで書き込みは行われないという仕様に注意する。
 
-### 2.3 特権レベルとアクセス制限 (将来的な拡張)
+### 2.3 特権レベルとアクセス制限
 
 CSR アドレスの上位ビットには以下の意味があります。
-- `addr[11:10]`: 読み書き制限 (11 は読み書き可能、11 以外の一部は読み取り専用)
+
+- `addr[11:10]`: 読み書き制限 (11 は読み取り専用)
 - `addr[9:8]`: 最小特権レベル (00: User, 01: Supervisor, 11: Machine)
 
-現在は簡易実装のため、特権チェックは行わずに全てのアクセスを許可しますが、将来的に `self.mode` と比較して違法命令例外を投げるように拡張可能です。
+現在の実装では、`addr[11:10] == 0b11` の領域（読み取り専用 CSR）への書き込みを試みると例外が発生します。
+また、`misa` は `0x40101104` (RV32IMCU) を返し、User モードの存在をサポートしています。将来的に特権レベル（`self.mode`）に応じた厳密なアクセスチェックを追加可能です。
 
 ## 3. 実装のステップ
 
