@@ -19,7 +19,7 @@ fn test_c_addi4spn_min() {
     // ビット 12-5: 00 0000 1 0 -> 0b00000010 = 0x02
     // inst: 000 00000010 000 00 -> 0x0040
     let inst = 0x0040;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 104);
@@ -40,7 +40,7 @@ fn test_c_addi4spn_max() {
     // ビット 12-5: 11 1111 1 1 -> 0b11111111 = 0xff
     // inst: 000 11111111 111 00 -> 0x1ffc
     let inst = 0x1ffc;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[15], 2020);
@@ -64,7 +64,7 @@ fn test_c_addi4spn_various_imm() {
     // rd' = 010 (x10)
     // inst: 000 01011010 010 00 -> 0x0b48
     let inst = 0x0b48;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 404);
@@ -86,7 +86,7 @@ fn test_c_addi() {
     // imm[5]: 0, imm[4:0]: 01010
     // inst: 000 0 01010 01010 01 -> 0x0529
     let inst = 0x0529;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 110);
@@ -104,7 +104,7 @@ fn test_c_addi() {
     // ビット 1:0 = 01
     // 000 1 01010 11111 01 -> 0b0001010101111101 -> 0x157d
     let inst = 0x157d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 109);
@@ -123,7 +123,7 @@ fn test_c_li() {
     // imm[5]: 0, imm[4:0]: 01010
     // inst: 010 0 01010 01010 01 -> 0b0100010100101001 -> 0x4529
     let inst = 0x4529;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 10);
@@ -135,7 +135,7 @@ fn test_c_li() {
     // rd: x11 (01011)
     // inst: 010 1 01011 11111 01 -> 0b0101010111111101 -> 0x55fd
     let inst = 0x55fd;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[11], 0xffff_ffff);
@@ -156,18 +156,14 @@ fn test_c_li_reserved() {
     // imm: 10 (001010)
     // inst: 010 0 00000 01010 01 -> 0b0100000000101001 -> 0x4029
     let inst = 0x4029;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     
-    // Should trap with exception code 2 (Illegal Instruction)
-    match result {
-        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
-        _ => panic!("Should trap"),
-    }
-    assert_eq!(cpu.pc, 0x100);
-    assert_eq!(cpu.csr.mcause, 2);
-    assert_eq!(cpu.csr.mepc, 0x0);
+    // HINT instruction (rd=x0) should be treated as NOP (Ok(2))
+    assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
+    assert_eq!(cpu.pc, 0x2);
+    assert_eq!(cpu.regs[0], 0);
 }
 
 #[test]
@@ -190,7 +186,7 @@ fn test_c_addi16sp() {
     // inst[2] = imm[5] = 0
     // inst: 011 0 00010 10000 01 -> 0b0110000101000001 -> 0x6141
     let inst = 0x6141;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 1024 + 16);
@@ -206,7 +202,7 @@ fn test_c_addi16sp() {
     // inst[2] = imm[5] = 1
     // inst: 011 1 00010 11111 01 -> 0b0111000101111101 -> 0x717d
     let inst = 0x717d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 1024);
@@ -218,7 +214,7 @@ fn test_c_addi16sp() {
     // inst[12] = 0, inst[6] = 1, inst[5] = 1, inst[4:3] = 11, inst[2] = 1
     // inst: 011 0 00010 11111 01 -> 0b0110000101111101 -> 0x617d
     let inst = 0x617d;
-    bus.write_inst16(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x4, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 1024 + 496);
@@ -230,7 +226,7 @@ fn test_c_addi16sp() {
     // inst[12] = 1, inst[6] = 0, inst[5] = 0, inst[4:3] = 00, inst[2] = 0
     // inst: 011 1 00010 00000 01 -> 0b0111000100000001 -> 0x7101
     let inst = 0x7101;
-    bus.write_inst16(0x6, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x6, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 1024 + 496 - 512);
@@ -246,9 +242,9 @@ fn test_c_addi16sp_reserved() {
     // imm = 0 is reserved
     // inst: 011 0 00010 00000 01 -> 0b0110000100000001 -> 0x6101
     let inst = 0x6101;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap"),
@@ -267,7 +263,7 @@ fn test_c_lui() {
     // imm[5]: 0, imm[4:0]: 00001
     // inst: 011 0 01010 00001 01 -> 0b0110010100000101 -> 0x6505
     let inst = 0x6505;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 0x1000);
@@ -278,7 +274,7 @@ fn test_c_lui() {
     // imm[5]: 1, imm[4:0]: 11111
     // inst: 011 1 01011 11111 01 -> 0b0111010111111101 -> 0x75fd
     let inst = 0x75fd;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[11], 0xffff_f000);
@@ -296,13 +292,13 @@ fn test_c_lui_reserved() {
     // c.lui x0, 1
     // inst: 011 0 00000 00001 01 -> 0b0110000000000101 -> 0x6005
     let inst = 0x6005;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
-    let result = cpu.step(&mut bus);
-    match result {
-        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
-        _ => panic!("Should trap"),
-    }
+    let (result, _) = cpu.step(&mut bus);
+    // HINT instruction (rd=x0) should be treated as NOP (Ok(2))
+    assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
+    assert_eq!(cpu.pc, 0x2);
+    assert_eq!(cpu.regs[0], 0);
 }
 
 #[test]
@@ -321,7 +317,7 @@ fn test_c_srli() {
     // shamt[4:0] (inst[6:2]): 00100
     // inst: 100 0 00 000 00100 01 -> 0b1000000000001001 -> 0x8011
     let inst = 0x8011;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0x0000_000F);
@@ -334,7 +330,7 @@ fn test_c_srli() {
     cpu.regs[9] = 1;
     // inst: 100 0 00 001 00001 01 -> 0b1000000010000101 -> 0x8085
     let inst = 0x8085;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[9], 0);
@@ -350,15 +346,15 @@ fn test_c_srli_hint_and_reserved() {
     // c.srli x8, 0 (HINT)
     // inst: 100 0 00 000 00000 01 -> 0x8001
     cpu.regs[8] = 0x1234;
-    bus.write_inst16(0x0, 0x8001);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, 0x8001);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0x1234); // Should not change
     assert_eq!(cpu.pc, 0x2);
 
     // c.srli x8, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 100 1 00 000 00000 01 -> 0x9001
-    bus.write_inst16(0x2, 0x9001);
-    let result = cpu.step(&mut bus);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x9001);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
@@ -382,7 +378,7 @@ fn test_c_srai() {
     // shamt[4:0] (inst[6:2]): 00100
     // inst: 100 0 01 000 00100 01 -> 0b1000010000001001 -> 0x8411
     let inst = 0x8411;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     // 0xFFFF_FF00 >>s 4 = 0xFFFF_FFF0
@@ -396,7 +392,7 @@ fn test_c_srai() {
     // shamt: 1 (00001)
     // inst: 100 0 01 001 00001 01 -> 0b1000010010000101 -> 0x8485
     let inst = 0x8485;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[9], 0x0000_0078);
@@ -412,15 +408,15 @@ fn test_c_srai_hint_and_reserved() {
     // c.srai x8, 0 (HINT)
     // inst: 100 0 01 000 00000 01 -> 0x8401
     cpu.regs[8] = 0x1234;
-    bus.write_inst16(0x0, 0x8401);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, 0x8401);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0x1234); // Should not change
     assert_eq!(cpu.pc, 0x2);
 
     // c.srai x8, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 100 1 01 000 00000 01 -> 0x9401
-    bus.write_inst16(0x2, 0x9401);
-    let result = cpu.step(&mut bus);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x9401);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
@@ -444,7 +440,7 @@ fn test_c_andi() {
     // imm[4:0] (inst[6:2]): 00001
     // inst: 100 0 10 000 00001 01 -> 0b1000100000000101 -> 0x8805
     let inst = 0x8805;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 1);
@@ -459,7 +455,7 @@ fn test_c_andi() {
     // imm[4:0]: 11111
     // inst: 100 1 10 001 11111 01 -> 0b1001100011111101 -> 0x98FD
     let inst = 0x98FD;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[9], 0xAAAA_AAAA);
@@ -473,7 +469,7 @@ fn test_c_andi() {
     // imm[4:0]: 00000
     // inst: 100 1 10 010 00000 01 -> 0b1001100100000001 -> 0x9901
     let inst = 0x9901;
-    bus.write_inst16(0x4, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x4, inst);
 
     cpu.step(&mut bus);
     // 0xFFFF_FFFF & 0xFFFF_FFE0 = 0xFFFF_FFE0
@@ -495,7 +491,7 @@ fn test_c_sub() {
     // rd': x8 (000), rs2': x9 (001)
     // inst: 100011 000 00 001 01 -> 0b1000110000000101 -> 0x8c05
     let inst = 0x8c05;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 70);
@@ -510,7 +506,7 @@ fn test_c_sub() {
     // rd': x10 (010), rs2': x11 (011)
     // inst: 100011 010 00 011 01 -> 0b1000110100001101 -> 0x8d0d
     let inst = 0x8d0d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 0xffff_fff6); // -10
@@ -531,7 +527,7 @@ fn test_c_xor() {
     // rd': x8 (000), rs2': x9 (001)
     // inst: 100011 000 01 001 01 -> 0b1000110000100101 -> 0x8c25
     let inst = 0x8c25;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0b0110);
@@ -545,7 +541,7 @@ fn test_c_xor() {
     // rd': x10 (010), rs2': x11 (011)
     // inst: 100011 010 01 011 01 -> 0b1000110100101101 -> 0x8d2d
     let inst = 0x8d2d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 0xEDCB_A987);
@@ -566,7 +562,7 @@ fn test_c_or() {
     // rd': x8 (000), rs2': x9 (001)
     // inst: 100011 000 10 001 01 -> 0b1000110001000101 -> 0x8c45
     let inst = 0x8c45;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0b1110);
@@ -580,7 +576,7 @@ fn test_c_or() {
     // rd': x10 (010), rs2': x11 (011)
     // inst: 100011 010 10 011 01 -> 0b1000110101001101 -> 0x8d4d
     let inst = 0x8d4d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 0x1234_5678);
@@ -601,7 +597,7 @@ fn test_c_and() {
     // rd': x8 (000), rs2': x9 (001)
     // inst: 100011 000 11 001 01 -> 0b1000110001100101 -> 0x8c65
     let inst = 0x8c65;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[8], 0b1000);
@@ -615,7 +611,7 @@ fn test_c_and() {
     // rd': x10 (010), rs2': x11 (011)
     // inst: 100011 010 11 011 01 -> 0b1000110101101101 -> 0x8d6d
     let inst = 0x8d6d;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[10], 0x1234_5678);
@@ -638,7 +634,7 @@ fn test_c_slli() {
     // shamt[4:0] (inst[6:2]): 00100
     // inst: 000 0 00001 00100 10 -> 0b0000000010010010 -> 0x0092
     let inst = 0x0092;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 0x0000_0010);
@@ -651,7 +647,7 @@ fn test_c_slli() {
     cpu.regs[2] = 1;
     // inst: 000 0 00010 11111 10 -> 0b0000000101111110 -> 0x017e
     let inst = 0x017e;
-    bus.write_inst16(0x2, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[2], 0x8000_0000);
@@ -667,30 +663,29 @@ fn test_c_slli_hint_and_reserved() {
     // c.slli x1, 0 (HINT)
     // inst: 000 0 00001 00000 10 -> 0x0082
     cpu.regs[1] = 0x1234;
-    bus.write_inst16(0x0, 0x0082);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, 0x0082);
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 0x1234); // Should not change
     assert_eq!(cpu.pc, 0x2);
 
     // c.slli x1, 32 (shamt[5] = 1, Reserved for RV32C)
     // inst: 000 1 00001 00000 10 -> 0x1082
-    bus.write_inst16(0x2, 0x1082);
-    let result = cpu.step(&mut bus);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x2, 0x1082);
+    let (result, _) = cpu.step(&mut bus);
     match result {
         crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
         _ => panic!("Should trap for shamt[5]=1 in RV32C"),
     }
     assert_eq!(cpu.pc, 0x100);
 
-    // c.slli x0, 1 (Reserved)
+    // c.slli x0, 1 (HINT)
     // inst: 000 0 00000 00001 10 -> 0x0006
     cpu.pc = 0x0;
-    bus.write_inst16(0x0, 0x0006);
-    let result = cpu.step(&mut bus);
-    match result {
-        crate::cpu::StepResult::Trap(code) => assert_eq!(code, 2),
-        _ => panic!("Should trap for rd=x0 in C.SLLI"),
-    }
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, 0x0006);
+    let (result, _) = cpu.step(&mut bus);
+    assert!(matches!(result, crate::cpu::StepResult::Ok(2)));
+    assert_eq!(cpu.pc, 0x2);
+    assert_eq!(cpu.regs[0], 0);
 }
 
 #[test]
@@ -709,7 +704,7 @@ fn test_c_mv() {
     // 0b1000_01010_01011_10 = 0x852e
 
     let inst = 0x852e;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[11] = 0x12345678;
 
     cpu.step(&mut bus);
@@ -721,7 +716,7 @@ fn test_c_mv() {
     // 0b1000_00001_00010_10 = 0x808a
     let mut cpu = Cpu::new(0x300);
     let inst = 0x808a;
-    bus.write_inst16(0x300, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x300, inst);
     cpu.regs[2] = 0xdeadbeef;
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[1], 0xdeadbeef);
@@ -737,7 +732,7 @@ fn test_c_mv_reserved() {
     // c.mv x0, x11
     // 0b1000_00000_01011_10 = 0x802e
     let inst = 0x802e;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x100);
     assert_eq!(cpu.csr.mcause, 2);
@@ -759,7 +754,7 @@ fn test_c_add() {
     // 0b1001_01010_01011_10 = 0x952e
 
     let inst = 0x952e;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[10] = 0x1234;
     cpu.regs[11] = 0x5678;
 
@@ -770,7 +765,7 @@ fn test_c_add() {
     // c.add x1, x2 (wrapping)
     let mut cpu = Cpu::new(0x300);
     let inst = 0x908a; // rd=1, rs2=2
-    bus.write_inst16(0x300, inst);
+    cpu.flush_cache_line(cpu.pc); cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x300, inst);
     cpu.regs[1] = 0xffff_ffff;
     cpu.regs[2] = 1;
 

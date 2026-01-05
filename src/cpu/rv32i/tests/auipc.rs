@@ -13,7 +13,7 @@ fn test_auipc() {
     // AUIPC x1, 0x12345 (imm=0x12345000, rd=1, opcode=0010111)
     // 0x12345000 | (1 << 7) | 0x17 = 0x12345097
     let inst_bin = 0x12345097;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     cpu.step(&mut bus);
 
@@ -29,7 +29,7 @@ fn test_auipc_x0() {
 
     // AUIPC x0, 0x12345
     let inst_bin = 0x12345017;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     cpu.step(&mut bus);
 

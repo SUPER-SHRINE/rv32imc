@@ -36,3 +36,11 @@ CLINT の状態を保持する構造体です。
 
 ### CPU の割り込みチェックとの連携
 - `Cpu::check_interrupts` 内で `bus.get_timer_interrupt_level()` および `bus.get_software_interrupt_level()` をチェックし、`mip.MTIP` および `mip.MSIP` を更新します。
+
+## 4. 実装状況
+
+現在、以下の機能が実装済みです。
+- 64bit タイマー (`mtime`) および比較レジスタ (`mtimecmp`)
+- ソフトウェア割り込みレジスタ (`msip`)
+- `mtime >= mtimecmp` によるタイマー割り込み発生
+- CPU ステップに同期したタイマーのインクリメント

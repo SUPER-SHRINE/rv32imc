@@ -41,7 +41,8 @@ fn run_test(path: &Path) -> Result<bool, String> {
     let max_steps = 1000000;
 
     loop {
-        match cpu.step(&mut bus) {
+        let (result, clock) = cpu.step(&mut bus);
+        match result {
             cpu::StepResult::Trap(code) => {
                 // ecall (8, 9, 11) で終了
                 if code == 8 || code == 9 || code == 11 {
@@ -50,7 +51,7 @@ fn run_test(path: &Path) -> Result<bool, String> {
             }
             _ => (),
         }
-        steps += 1;
+        steps += clock;
         if steps > max_steps {
             println!("Timeout reached at steps: {}", steps);
             println!("Final State:");

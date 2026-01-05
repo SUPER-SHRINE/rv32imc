@@ -16,7 +16,8 @@ fn test_jal() {
     // inst = 0x00000000 | (0x80 << 21) | (0 << 20) | (0 << 12) | (1 << 7) | 0x6f
     //      = 0x100000ef
     let inst_bin = 0x100000ef;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     cpu.step(&mut bus);
 
@@ -32,7 +33,8 @@ fn test_jal_x0() {
 
     // JAL x0, 0x100
     let inst_bin = 0x1000006f;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     cpu.step(&mut bus);
 
@@ -58,7 +60,8 @@ fn test_jal_neg() {
     // 0x80000000 | 0x70000000 | 0x00100000 | 0x000ff000 | 0x00000080 | 0x6f
     // = 0xf01ff0ef
     let inst_bin = 0xf01ff0ef;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     cpu.step(&mut bus);
 
@@ -76,7 +79,8 @@ fn test_jalr() {
     // JALR x1, 0x10(x2) (imm=0x10, rs1=2, funct3=0, rd=1, opcode=1100111)
     // inst = 0x010100e7
     let inst_bin = 0x010100e7;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     cpu.step(&mut bus);
 
@@ -95,7 +99,8 @@ fn test_jalr_align() {
     // 0x2001 + 0x11 = 0x2012. 0x2012 & ~1 = 0x2012
     // inst = 0x01110067
     let inst_bin = 0x01110067;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     cpu.step(&mut bus);
 
@@ -106,7 +111,8 @@ fn test_jalr_align() {
     cpu.regs[2] = 0x2000;
     // JALR x0, 0x11(x2) -> 0x2011 & ~1 = 0x2010
     let inst_bin = 0x01110067;
-    bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(0x1004);
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x2010);
 }

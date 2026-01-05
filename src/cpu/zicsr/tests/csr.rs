@@ -22,7 +22,7 @@ fn test_csrrw() {
     // csr: 0x305 (mtvec)
     // 0x305_09_1_73 -> 0x30509173
     let inst = 0x30509173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -47,7 +47,7 @@ fn test_csrrw_x0_rd() {
     // rd: x0 (0)
     // 0x341_09_0_73 -> 0x34109073
     let inst = 0x34109073;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -75,7 +75,7 @@ fn test_csrrs() {
     // csr: 0x300 (mstatus)
     // 0x300_0a_1_73 -> 0x3000a173
     let inst = 0x3000a173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -97,7 +97,7 @@ fn test_csrrs_x0_rs1() {
     // rs1: x0 (0)
     // 0x300_0a_0_73 -> 0x30002173
     let inst = 0x30002173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -125,7 +125,7 @@ fn test_csrrc() {
     // csr: 0x300 (mstatus)
     // 0x300_0b_1_73 -> 0x3000b173
     let inst = 0x3000b173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -147,7 +147,7 @@ fn test_csrrc_x0_rs1() {
     // rs1: x0 (0)
     // 0x300_0b_0_73 -> 0x30003173
     let inst = 0x30003173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -173,7 +173,7 @@ fn test_csrrwi() {
     // csr: 0x341 (mepc)
     // 0x341fd173
     let inst = 0x341fd173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -196,7 +196,7 @@ fn test_csrrwi_x0_rd() {
     // uimm: 15 (0x0f)
     // 0x341_0f_5_00_73 -> 0x3417d073
     let inst = 0x3417d073;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -222,7 +222,7 @@ fn test_csrrsi() {
     // csr: 0x300 (mstatus)
     // 0x300_03_6_10 -> 0x3001e173
     let inst = 0x3001e173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -244,7 +244,7 @@ fn test_csrrsi_x0_uimm() {
     // uimm: 0
     // 0x300_00_6_10 -> 0x30006173
     let inst = 0x30006173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -279,7 +279,7 @@ fn test_csrrci() {
     // 0x300_00000 | (0x0a << 15) | (0x07 << 12) | (0x02 << 7) | 0x73
     // 0x30000000 | 0x00050000 | 0x00007000 | 0x00000100 | 0x00000073 = 0x30057173
     let inst = 0x30057173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 
@@ -302,7 +302,7 @@ fn test_csrrci_x0_uimm() {
     // funct3: 0b111 (7)
     // 0x300_00_7_10 -> 0x30007173
     let inst = 0x30007173;
-    bus.write_inst32(0x0100, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0100, inst);
 
     cpu.step(&mut bus);
 

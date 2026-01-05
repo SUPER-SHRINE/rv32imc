@@ -16,7 +16,7 @@ fn test_mul() {
     // mul x3, x1, x2 (0x022081b3)
     // opcode: 0110011, rd: 3, funct3: 000, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x022081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 200);
@@ -34,7 +34,7 @@ fn test_mul_negative() {
 
     // mul x3, x1, x2 (0x022081b3)
     let inst = 0x022081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffce); // -50
@@ -52,7 +52,7 @@ fn test_mul_overflow() {
 
     // mul x3, x1, x2 (0x022081b3)
     let inst = 0x022081b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     // 0x7fffffff * 2 = 0xfffffffe (下位32ビット)
@@ -74,7 +74,7 @@ fn test_mulh() {
     // mulh x3, x1, x2 (0x022091b3)
     // opcode: 0110011, rd: 3, funct3: 001, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x022091b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x3fffffff);
@@ -94,7 +94,7 @@ fn test_mulh_negative() {
 
     // mulh x3, x1, x2 (0x022091b3)
     let inst = 0x022091b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x0);
@@ -114,7 +114,7 @@ fn test_mulh_mixed() {
 
     // mulh x3, x1, x2 (0x022091b3)
     let inst = 0x022091b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffff);
@@ -135,7 +135,7 @@ fn test_mulhsu() {
     // mulhsu x3, x1, x2 (0x0220a1b3)
     // opcode: 0110011, rd: 3, funct3: 010, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220a1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffff);
@@ -155,7 +155,7 @@ fn test_mulhsu_positive() {
 
     // mulhsu x3, x1, x2 (0x0220a1b3)
     let inst = 0x0220a1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x00000000);
@@ -176,7 +176,7 @@ fn test_mulhu() {
     // mulhu x3, x1, x2 (0x0220b1b3)
     // opcode: 0110011, rd: 3, funct3: 011, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220b1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xfffffffe);
@@ -199,7 +199,7 @@ fn test_mulhsu_both_negative_interpretation() {
 
     // mulhsu x3, x1, x2 (0x0220a1b3)
     let inst = 0x0220a1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffff);
@@ -218,7 +218,7 @@ fn test_div() {
     // div x3, x1, x2 (0x0220c1b3)
     // opcode: 0110011, rd: 3, funct3: 100, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220c1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 6);
@@ -236,7 +236,7 @@ fn test_div_negative() {
 
     // div x3, x1, x2
     let inst = 0x0220c1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xfffffffa); // -6
@@ -252,7 +252,7 @@ fn test_div_by_zero() {
 
     // div x3, x1, x2
     let inst = 0x0220c1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffff); // -1
@@ -269,7 +269,7 @@ fn test_div_overflow() {
 
     // div x3, x1, x2
     let inst = 0x0220c1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0x80000000);
@@ -287,7 +287,7 @@ fn test_divu() {
     // divu x3, x1, x2 (0x0220d1b3)
     // opcode: 0110011, rd: 3, funct3: 101, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220d1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 6);
@@ -303,7 +303,7 @@ fn test_divu_by_zero() {
 
     // divu x3, x1, x2
     let inst = 0x0220d1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xffffffff); // 2^32 - 1
@@ -321,7 +321,7 @@ fn test_rem() {
     // rem x3, x1, x2 (0x0220e1b3)
     // opcode: 0110011, rd: 3, funct3: 110, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220e1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 2);
@@ -338,7 +338,7 @@ fn test_rem_negative() {
 
     // rem x3, x1, x2
     let inst = 0x0220e1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 0xfffffffe); // -2
@@ -354,7 +354,7 @@ fn test_rem_by_zero() {
 
     // rem x3, x1, x2
     let inst = 0x0220e1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 20); // dividend
@@ -372,7 +372,7 @@ fn test_remu() {
     // remu x3, x1, x2 (0x0220f1b3)
     // opcode: 0110011, rd: 3, funct3: 111, rs1: 1, rs2: 2, funct7: 0000001
     let inst = 0x0220f1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 2);
@@ -388,7 +388,7 @@ fn test_remu_by_zero() {
 
     // remu x3, x1, x2
     let inst = 0x0220f1b3;
-    bus.write_inst32(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.regs[3], 20); // dividend
