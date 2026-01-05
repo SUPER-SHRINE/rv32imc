@@ -96,7 +96,7 @@ fn test_external_interrupt() {
     bus.plic.set_interrupt(1);  // ID 1 を保留中に
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証
     // トラップが発生しているはず (Machine External Interrupt = 0x8000000b)
@@ -138,12 +138,52 @@ fn test_timer_interrupt() {
     bus.timer_interrupt = true;
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証
     assert!(matches!(result, StepResult::Trap(0x8000_0007)));
     assert_eq!(cpu.pc, trap_handler_addr);
     assert_eq!(cpu.csr.read(0x342).unwrap(), 0x8000_0007);
+}
+
+#[test]
+fn test_timer_interrupt_after_csr_op() {
+    let mut cpu = Cpu::new(0x0);
+    let mut bus = InterruptTestBus::new();
+
+    // 1. 割り込みを有効化する
+    // mstatus.MIE = 1, mie.MTIE = 1, mtvec = 0x200
+    let _ = cpu.csr.write(0x300, 1 << 3);
+    let _ = cpu.csr.write(0x304, 1 << 7);
+    let _ = cpu.csr.write(0x305, 0x200);
+
+    // CSR 命令を配置 (CSRRW x0, mscratch, x1) -> rd=0 なので読み出さないはず
+    // mscratch(0x340) に値を書いておき、x1(初期値0) で上書きする
+    let _ = cpu.csr.write(0x340, 0xdeadbeef);
+    cpu.regs[1] = 0x12345678;
+    // 0x00000013 は ADDI x0, x0, 0 (NOP)
+    // 0x34001073 は csrrw x0, mscratch, x1
+    bus.mock_bus.write_inst32(0, 0x34009073); 
+
+    // 2. タイマー割り込みを発生させる
+    bus.timer_interrupt = true;
+
+    // 3. 実行
+    // このステップで CSRRW が実行され、割り込みチェックが行われるはず
+    // 割り込みは命令実行の直前にチェックされるので、最初の step で Trap になる
+    let (result, _) = cpu.step(&mut bus);
+
+    // 4. 検証
+    assert!(matches!(result, StepResult::Trap(0x8000_0007)));
+    
+    // 5. 割り込み処理から戻った後にもう一度 CSR 操作をしてみる
+    cpu.pc = 0x0;
+    cpu.csr.mstatus |= 1 << 3; // MIE を戻す
+    bus.timer_interrupt = false;
+    
+    // rd=0 の CSRRW を実行 (読み出し副作用がないことを期待)
+    let _ = cpu.step(&mut bus); 
+    assert_eq!(cpu.csr.read(0x340).unwrap(), 0x12345678);
 }
 
 #[test]
@@ -165,7 +205,7 @@ fn test_interrupt_priority() {
     bus.plic.set_interrupt(1);
 
     // 3. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 4. 検証: 外部割り込みが優先されるはず
     assert!(matches!(result, StepResult::Trap(0x8000_000b)));
@@ -203,7 +243,7 @@ fn test_full_interrupt_handler_flow() {
 
     // 3. 実行
     // 1ステップ目: 割り込み検知 -> トラップハンドラへジャンプ
-    let result1 = cpu.step(&mut bus);
+    let (result1, _) = cpu.step(&mut bus);
     assert!(matches!(result1, StepResult::Trap(0x8000_000b)));
     assert_eq!(cpu.pc, 0x100);
 
@@ -220,7 +260,7 @@ fn test_full_interrupt_handler_flow() {
     // PLIC 信号をクリアしておく（そうしないと再度割り込みが発生する）
     bus.plic.clear_interrupt(1);
 
-    let result_mret = cpu.step(&mut bus); // mret
+    let (result_mret, _) = cpu.step(&mut bus); // mret
     assert!(matches!(result_mret, StepResult::Jumped));
     assert_eq!(cpu.pc, 0x0); // mepc (0) に戻るはず
 
@@ -243,11 +283,11 @@ fn test_interrupt_disabled_by_mstatus() {
     bus.plic.set_interrupt(1);
 
     // 2. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず
-    assert!(matches!(result, StepResult::Ok));
+    assert!(matches!(result, StepResult::Ok(4)));
     assert_eq!(cpu.pc, 4);
 }
 
@@ -265,10 +305,10 @@ fn test_interrupt_disabled_by_mie() {
     bus.plic.set_interrupt(1);
 
     // 2. 実行
-    let result = cpu.step(&mut bus);
+    let (result, _) = cpu.step(&mut bus);
 
     // 3. 検証
     // トラップは発生せず、通常通り命令が実行されるはず
-    assert!(matches!(result, StepResult::Ok));
+    assert!(matches!(result, StepResult::Ok(4)));
     assert_eq!(cpu.pc, 4);
 }

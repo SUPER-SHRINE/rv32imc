@@ -31,10 +31,11 @@ impl Cpu {
         true
     }
 
-    pub(crate) fn csrrw(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrw(&mut self, csr: u16, rd: u8, rs1: u8) -> StepResult {
+        let rd:       usize = rd  as usize;
+        let rs1:      usize = rs1 as usize;
+        let csr_addr: u32   = csr as u32;
 
         if !self.check_csr_privilege(csr_addr, true) {
             return StepResult::Trap(2);
@@ -52,13 +53,14 @@ impl Cpu {
         if let Err(_) = self.csr.write(csr_addr, new_val) {
             return StepResult::Trap(2);
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn csrrs(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrs(&mut self, csr: u16, rd: u8, rs1: u8) -> StepResult {
+        let rd:       usize = rd  as usize;
+        let rs1:      usize = rs1 as usize;
+        let csr_addr: u32   = csr as u32;
 
         let is_write = rs1 != 0;
         if !self.check_csr_privilege(csr_addr, is_write) {
@@ -79,13 +81,14 @@ impl Cpu {
                 return StepResult::Trap(2);
             }
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn csrrc(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let rs1 = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrc(&mut self, csr: u16, rd: u8, rs1: u8) -> StepResult {
+        let rd:       usize = rd  as usize;
+        let rs1:      usize = rs1 as usize;
+        let csr_addr: u32   = csr as u32;
 
         let is_write = rs1 != 0;
         if !self.check_csr_privilege(csr_addr, is_write) {
@@ -106,13 +109,14 @@ impl Cpu {
                 return StepResult::Trap(2);
             }
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn csrrwi(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrwi(&mut self, csr: u16, rd: u8, uimm: u8) -> StepResult {
+        let rd:       usize = rd   as usize;
+        let uimm:     u32   = uimm as u32;
+        let csr_addr: u32   = csr  as u32;
 
         if !self.check_csr_privilege(csr_addr, true) {
             return StepResult::Trap(2);
@@ -129,13 +133,14 @@ impl Cpu {
         if let Err(_) = self.csr.write(csr_addr, uimm) {
             return StepResult::Trap(2);
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn csrrsi(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrsi(&mut self, csr: u16, rd: u8, uimm: u8) -> StepResult {
+        let rd:       usize = rd   as usize;
+        let uimm:     u32   = uimm as u32;
+        let csr_addr: u32   = csr  as u32;
 
         let is_write = uimm != 0;
         if !self.check_csr_privilege(csr_addr, is_write) {
@@ -154,13 +159,14 @@ impl Cpu {
                 return StepResult::Trap(2);
             }
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 
-    pub(crate) fn csrrci(&mut self, inst_bin: u32) -> StepResult {
-        let csr_addr = (inst_bin >> 20) & 0xfff;
-        let uimm = (inst_bin >> 15) & 0x1f;
-        let rd = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(crate) fn csrrci(&mut self, csr: u16, rd: u8, uimm: u8) -> StepResult {
+        let rd:       usize = rd   as usize;
+        let uimm:     u32   = uimm as u32;
+        let csr_addr: u32   = csr  as u32;
 
         let is_write = uimm != 0;
         if !self.check_csr_privilege(csr_addr, is_write) {
@@ -179,6 +185,6 @@ impl Cpu {
                 return StepResult::Trap(2);
             }
         }
-        StepResult::Ok
+        StepResult::Ok(4)
     }
 }

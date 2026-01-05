@@ -1,27 +1,30 @@
-use super::Cpu;
+use crate::cpu::instructions::Instruction;
 
-impl Cpu {
-    pub(super) fn decode_i_type(&self, inst_bin: u32) -> (usize, usize, u32) {
-        let rd = ((inst_bin >> 7) & 0x1f) as usize;
-        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
-        let imm = (inst_bin as i32 >> 20) as u32; // Sign extension
+impl Instruction {
+    #[inline(always)]
+    pub(super) fn decode_i_type(inst_bin: u32) -> (u8, u8, u16) {
+        let rd:  u8  = ((inst_bin >> 7) & 0x1f) as u8;
+        let rs1: u8  = ((inst_bin >> 15) & 0x1f) as u8;
+        let imm: u16 = (inst_bin as i32 >> 20) as u16; // Sign extension
         (rd, rs1, imm)
     }
 
-    pub(super) fn decode_u_type(&self, inst_bin: u32) -> (usize, u32) {
-        let rd = ((inst_bin >> 7) & 0x1f) as usize;
-        let imm = inst_bin & 0xffff_f000;
+    #[inline(always)]
+    pub(super) fn decode_u_type(inst_bin: u32) -> (u8, u32) {
+        let rd:  u8  = ((inst_bin >> 7) & 0x1f) as u8;
+        let imm: u32 = inst_bin & 0xffff_f000;
         (rd, imm)
     }
 
-    pub(super) fn decode_j_type(&self, inst_bin: u32) -> (usize, u32) {
-        let rd = ((inst_bin >> 7) & 0x1f) as usize;
-        let imm20 = (inst_bin >> 31) & 0x1;
-        let imm10_1 = (inst_bin >> 21) & 0x3ff;
-        let imm11 = (inst_bin >> 20) & 0x1;
-        let imm19_12 = (inst_bin >> 12) & 0xff;
+    #[inline(always)]
+    pub(super) fn decode_j_type(inst_bin: u32) -> (u8, u32) {
+        let rd:       u8  = ((inst_bin >> 7) & 0x1f) as u8;
+        let imm20:    u32 = (inst_bin >> 31) & 0x1;
+        let imm10_1:  u32 = (inst_bin >> 21) & 0x3ff;
+        let imm11:    u32 = (inst_bin >> 20) & 0x1;
+        let imm19_12: u32 = (inst_bin >> 12) & 0xff;
 
-        let imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+        let imm: u32 = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
 
         // Sign extension from 21st bit
         let imm = if imm20 != 0 {
@@ -33,13 +36,14 @@ impl Cpu {
         (rd, imm)
     }
 
-    pub(super) fn decode_b_type(&self, inst_bin: u32) -> (usize, usize, u32) {
-        let imm12 = (inst_bin >> 31) & 0x1;
-        let imm10_5 = (inst_bin >> 25) & 0x3f;
-        let rs2 = ((inst_bin >> 20) & 0x1f) as usize;
-        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
-        let imm4_1 = (inst_bin >> 8) & 0xf;
-        let imm11 = (inst_bin >> 7) & 0x1;
+    #[inline(always)]
+    pub(super) fn decode_b_type(inst_bin: u32) -> (u8, u8, u16) {
+        let imm12:   u32 = (inst_bin >> 31) & 0x1;
+        let imm10_5: u32 = (inst_bin >> 25) & 0x3f;
+        let imm4_1:  u32 = (inst_bin >> 8) & 0xf;
+        let imm11:   u32 = (inst_bin >> 7) & 0x1;
+        let rs2:     u8  = ((inst_bin >> 20) & 0x1f) as u8;
+        let rs1:     u8  = ((inst_bin >> 15) & 0x1f) as u8;
 
         let imm = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
 
@@ -50,31 +54,49 @@ impl Cpu {
             imm
         };
 
-        (rs1, rs2, imm)
+        (rs1, rs2, imm as u16)
     }
 
-    pub(super) fn decode_s_type(&self, inst_bin: u32) -> (usize, usize, u32) {
-        let imm11_5 = (inst_bin >> 25) & 0x7f;
-        let rs2 = ((inst_bin >> 20) & 0x1f) as usize;
-        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
-        let imm4_0 = (inst_bin >> 7) & 0x1f;
+    #[inline(always)]
+    pub(super) fn decode_s_type(inst_bin: u32) -> (u8, u8, u16) {
+        let rs1:     u8  = ((inst_bin >> 15) & 0x1f) as u8;
+        let rs2:     u8  = ((inst_bin >> 20) & 0x1f) as u8;
+        let imm11_5: u32 = (inst_bin >> 25) & 0x7f;
+        let imm4_0:  u32 = (inst_bin >> 7) & 0x1f;
 
         let imm = (imm11_5 << 5) | imm4_0;
 
         // Sign extension from 12th bit
-        let imm = ((imm as i32) << 20 >> 20) as u32;
+        let imm = ((imm as i32) << 20 >> 20) as u16;
 
         (rs1, rs2, imm)
     }
 
-    pub(super) fn decode_r_type(&self, inst_bin: u32) -> (usize, usize, usize) {
-        let rs2 = ((inst_bin >> 20) & 0x1f) as usize;
-        let rs1 = ((inst_bin >> 15) & 0x1f) as usize;
-        let rd = ((inst_bin >> 7) & 0x1f) as usize;
+    #[inline(always)]
+    pub(super) fn decode_r_type(inst_bin: u32) -> (u8, u8, u8) {
+        let rs2: u8 = ((inst_bin >> 20) & 0x1f) as u8;
+        let rs1: u8 = ((inst_bin >> 15) & 0x1f) as u8;
+        let rd:  u8 = ((inst_bin >> 7) & 0x1f) as u8;
         (rd, rs1, rs2)
     }
 
-    pub(super) fn decode_ci_type(&self, inst_bin: u16) -> (usize, u32) {
+    #[inline(always)]
+    pub(super) fn decode_csr_type(inst_bin: u32) -> (u16, u8, u8) {
+        let csr: u16 = ((inst_bin >> 20) & 0xfff) as u16;
+        let rd:  u8  = ((inst_bin >> 7) & 0x1f) as u8;
+        let rs1: u8  = ((inst_bin >> 15) & 0x1f) as u8;
+        (csr, rd, rs1)
+    }
+
+    #[inline(always)]
+    pub(super) fn decode_csr_i_type(inst_bin: u32) -> (u16, u8, u8) {
+        let csr:  u16 = ((inst_bin >> 20) & 0xfff) as u16;
+        let rd:   u8  = ((inst_bin >> 7) & 0x1f) as u8;
+        let uimm: u8  = ((inst_bin >> 15) & 0x1f) as u8;
+        (csr, rd, uimm)
+    }
+
+    pub(super) fn decode_ci_type(inst_bin: u16) -> (usize, u32) {
         let rd = ((inst_bin >> 7) & 0x1f) as usize;
         let imm5 = (inst_bin >> 12) & 0x1;
         let imm4_0 = (inst_bin >> 2) & 0x1f;
@@ -86,7 +108,7 @@ impl Cpu {
         (rd, imm)
     }
 
-    pub(super) fn decode_ci_shamt_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_ci_shamt_type(inst_bin: u16) -> (usize, u32) {
         let rd = ((inst_bin >> 7) & 0x1f) as usize;
         let shamt5 = (inst_bin >> 12) & 0x1;
         let shamt4_0 = (inst_bin >> 2) & 0x1f;
@@ -94,7 +116,7 @@ impl Cpu {
         (rd, shamt as u32)
     }
 
-    pub(super) fn decode_ciw_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_ciw_type(inst_bin: u16) -> (usize, u32) {
         let rd_prime = ((inst_bin >> 2) & 0x7) as usize;
 
         // nzuimm[9:2] bit structure in C.ADDI4SPN:
@@ -113,7 +135,7 @@ impl Cpu {
         (8 + rd_prime, nzuimm as u32)
     }
 
-    pub(super) fn decode_cl_type(&self, inst_bin: u16) -> (usize, usize, u32) {
+    pub(super) fn decode_cl_type(inst_bin: u16) -> (usize, usize, u32) {
         let rd_prime = ((inst_bin >> 2) & 0x7) as usize;
         let rs1_prime = ((inst_bin >> 7) & 0x7) as usize;
         
@@ -131,7 +153,7 @@ impl Cpu {
         (8 + rd_prime, 8 + rs1_prime, imm as u32)
     }
 
-    pub(super) fn decode_cs_type(&self, inst_bin: u16) -> (usize, usize, u32) {
+    pub(super) fn decode_cs_type(inst_bin: u16) -> (usize, usize, u32) {
         let rs2_prime = ((inst_bin >> 2) & 0x7) as usize;
         let rs1_prime = ((inst_bin >> 7) & 0x7) as usize;
 
@@ -149,7 +171,7 @@ impl Cpu {
         (8 + rs1_prime, 8 + rs2_prime, imm as u32)
     }
 
-    pub(super) fn decode_cj_type(&self, inst_bin: u16) -> u32 {
+    pub(super) fn decode_cj_type(inst_bin: u16) -> u32 {
         // imm[11|4|9:8|10|6|7|3:1|5] bit structure in C.JAL:
         // inst[12]    -> imm[11]
         // inst[11]    -> imm[4]
@@ -177,7 +199,7 @@ impl Cpu {
         imm
     }
 
-    pub(super) fn decode_c_addi16sp_imm(&self, inst_bin: u16) -> u32 {
+    pub(super) fn decode_c_addi16sp_imm(inst_bin: u16) -> u32 {
         // imm[9|4|6|8:7|5] bit structure in C.ADDI16SP:
         // inst[12] -> imm[9]
         // inst[6]  -> imm[4]
@@ -199,7 +221,7 @@ impl Cpu {
         imm
     }
 
-    pub(super) fn decode_cb_shamt_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_cb_shamt_type(inst_bin: u16) -> (usize, u32) {
         let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
         let shamt5 = (inst_bin >> 12) & 0x1;
         let shamt4_0 = (inst_bin >> 2) & 0x1f;
@@ -207,7 +229,7 @@ impl Cpu {
         (8 + rd_prime, shamt as u32)
     }
 
-    pub(super) fn decode_cb_andi_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_cb_andi_type(inst_bin: u16) -> (usize, u32) {
         let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
         let imm5 = (inst_bin >> 12) & 0x1;
         let imm4_0 = (inst_bin >> 2) & 0x1f;
@@ -219,13 +241,13 @@ impl Cpu {
         (8 + rd_prime, imm)
     }
 
-    pub(super) fn decode_ca_type(&self, inst_bin: u16) -> (usize, usize) {
+    pub(super) fn decode_ca_type(inst_bin: u16) -> (usize, usize) {
         let rd_prime = ((inst_bin >> 7) & 0x7) as usize;
         let rs2_prime = ((inst_bin >> 2) & 0x7) as usize;
         (8 + rd_prime, 8 + rs2_prime)
     }
 
-    pub(super) fn decode_cb_branch_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_cb_branch_type(inst_bin: u16) -> (usize, u32) {
         let rs1_prime = ((inst_bin >> 7) & 0x7) as usize;
 
         // imm[8|4:3|7:6|2:1|5] bit structure in C.BEQZ/C.BNEZ:
@@ -249,7 +271,7 @@ impl Cpu {
         (8 + rs1_prime, imm)
     }
 
-    pub(super) fn decode_c_lwsp_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_c_lwsp_type(inst_bin: u16) -> (usize, u32) {
         let rd = ((inst_bin >> 7) & 0x1f) as usize;
 
         // imm[5|4:2|7:6] bit structure in C.LWSP:
@@ -266,7 +288,7 @@ impl Cpu {
         (rd, imm as u32)
     }
 
-    pub(super) fn decode_c_swsp_type(&self, inst_bin: u16) -> (usize, u32) {
+    pub(super) fn decode_c_swsp_type(inst_bin: u16) -> (usize, u32) {
         let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
 
         // imm[5:2|7:6] bit structure in C.SWSP:
@@ -281,41 +303,41 @@ impl Cpu {
         (rs2, imm as u32)
     }
 
-    pub(super) fn decode_cr_type(&self, inst_bin: u16) -> (usize, usize) {
+    pub(super) fn decode_cr_type(inst_bin: u16) -> (usize, usize) {
         let rs1_rd = ((inst_bin >> 7) & 0x1f) as usize;
         let rs2 = ((inst_bin >> 2) & 0x1f) as usize;
         (rs1_rd, rs2)
     }
 
-    pub(super) fn decode_opcode(&self, inst_bin: u32) -> u32 {
+    pub(super) fn decode_opcode(inst_bin: u32) -> u32 {
         inst_bin & 0x7f
     }
     
-    pub(super) fn decode_funct3(&self, inst_bin: u32) -> u32 {
+    pub(super) fn decode_funct3(inst_bin: u32) -> u32 {
         (inst_bin >> 12) & 0x7
     }
     
-    pub(super) fn decode_funct7(&self, inst_bin: u32) -> u32 {
+    pub(super) fn decode_funct7(inst_bin: u32) -> u32 {
         (inst_bin >> 25) & 0x7f
     }
     
-    pub(super) fn decode_quadrant(&self, inst_bin: u16) -> u16 {
+    pub(super) fn decode_quadrant(inst_bin: u16) -> u16 {
         inst_bin & 0x3
     }
 
-    pub(super) fn decode_c_funct2(&self, inst_bin: u16) -> u16 {
+    pub(super) fn decode_c_funct2(inst_bin: u16) -> u16 {
         (inst_bin >> 10) & 0x3
     }
     
-    pub(super) fn decode_c_funct3(&self, inst_bin: u16) -> u16 {
+    pub(super) fn decode_c_funct3(inst_bin: u16) -> u16 {
         (inst_bin >> 13) & 0x7
     }
     
-    pub(super) fn decode_c_funct4(&self, inst_bin: u16) -> u16 {
+    pub(super) fn decode_c_funct4(inst_bin: u16) -> u16 {
         (inst_bin >> 12) & 0xf
     }
 
-    pub(super) fn decode_c_funct6(&self, inst_bin: u16) -> u16 {
+    pub(super) fn decode_c_funct6(inst_bin: u16) -> u16 {
         (inst_bin >> 10) & 0x3f
     }
 }

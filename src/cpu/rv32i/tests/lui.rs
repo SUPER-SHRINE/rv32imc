@@ -13,7 +13,7 @@ fn test_lui() {
     // LUI x1, 0x12345 (imm=0x12345000, rd=1, opcode=0110111)
     // 0x12345000 | (1 << 7) | 0x37 = 0x123450b7
     let inst_bin = 0x123450b7;
-    bus.write_inst32(0, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst_bin);
 
     cpu.step(&mut bus);
 
@@ -29,7 +29,7 @@ fn test_lui_x0() {
 
     // LUI x0, 0x12345
     let inst_bin = 0x12345037;
-    bus.write_inst32(0, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0, inst_bin);
 
     cpu.step(&mut bus);
 

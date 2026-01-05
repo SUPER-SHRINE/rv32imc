@@ -19,7 +19,8 @@ fn test_sb() {
     // inst = 0000000_00010_00001_000_00100_0100011
     //      = 0x00208223
     let inst_bin = 0x00208223;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     // 1. 通常のストア
     cpu.regs[1] = 0x1000;
@@ -36,7 +37,8 @@ fn test_sb() {
     // inst = 1111111_00010_00001_000_11100_0100011
     //      = 0xFE208E23
     let inst_bin = 0xFE208E23;
-    bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(0x1004);
     cpu.regs[1] = 0x1008;
     cpu.regs[2] = 0xDEADBEEF;
     cpu.step(&mut bus);
@@ -59,7 +61,8 @@ fn test_sh() {
     // inst = 0000000_00010_00001_001_00100_0100011
     //      = 0x00209223
     let inst_bin = 0x00209223;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     // 1. 通常のストア
     cpu.regs[1] = 0x1000;
@@ -76,7 +79,8 @@ fn test_sh() {
     // inst = 1111111_00010_00001_001_11100_0100011
     //      = 0xFE209E23
     let inst_bin = 0xFE209E23;
-    bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(0x1004);
     cpu.regs[1] = 0x1008;
     cpu.regs[2] = 0xDEADBEEF;
     cpu.step(&mut bus);
@@ -99,7 +103,8 @@ fn test_sw() {
     // inst = 0000000_00010_00001_010_00100_0100011
     //      = 0x0020A223
     let inst_bin = 0x0020A223;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(0x1000);
 
     // 1. 通常のストア
     cpu.regs[1] = 0x1000;
@@ -116,7 +121,8 @@ fn test_sw() {
     // inst = 1111111_00010_00001_010_11100_0100011
     //      = 0xFE20AE23
     let inst_bin = 0xFE20AE23;
-    bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1004, inst_bin);
+    cpu.flush_cache_line(0x1004);
     cpu.regs[1] = 0x1008;
     cpu.regs[2] = 0xDEADBEEF;
     cpu.step(&mut bus);

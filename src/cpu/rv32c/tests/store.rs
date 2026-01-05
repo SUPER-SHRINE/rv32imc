@@ -22,7 +22,7 @@ fn test_c_sw() {
     // imm: 0 (imm[5:3]=000, imm[2]=0, imm[6]=0)
     // inst bits: 110 000 000 0 0 001 00 -> 0b1100_0000_0000_0100 = 0xc004
     let inst = 0xc004;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(bus.read32(0x100), 0x12345678);
@@ -46,7 +46,7 @@ fn test_c_sw_offset() {
     // inst bits: 110 (funct3) 111 (imm[5:3]) 000 (rs1') 1 (imm[2]) 1 (imm[6]) 111 (rs2') 00 (op)
     // inst bits: 110 111 000 1 1 111 00 -> 0b1101_1100_0111_1100 = 0xdc7c
     let inst = 0xdc7c;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(bus.read32(0x17C), 0xDEADBEEF);
@@ -70,7 +70,7 @@ fn test_c_sw_various_regs() {
     // inst bits: 110 (funct3) 000 (imm[5:3]) 111 (rs1') 1 (imm[2]) 0 (imm[6]) 000 (rs2') 00 (op)
     // inst bits: 110 000 111 1 0 000 00 -> 0b1100_0011_1100_0000 = 0xc3c0
     let inst = 0xc3c0;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(bus.read32(0x204), 0xAAAABBBB);
@@ -94,7 +94,7 @@ fn test_c_swsp() {
     // imm: 0 (imm[5:2]=0000, imm[7:6]=00)
     // inst bits: 110 000000 00001 10 -> 0b1100_0000_0000_0110 = 0xc006
     let inst = 0xc006;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(bus.read32(0x100), 0x12345678);
@@ -117,7 +117,7 @@ fn test_c_swsp_offset() {
     // inst bits: 110 (funct3) 1111 (imm[5:2]) 11 (imm[7:6]) 11111 (rs2) 10 (op)
     // inst bits: 110 1111 11 11111 10 -> 0b1101_1111_1111_1110 = 0xdffe
     let inst = 0xdffe;
-    bus.write_inst16(0x0, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x0, inst);
 
     cpu.step(&mut bus);
     assert_eq!(bus.read32(0x200 + 252), 0x87654321);

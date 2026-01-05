@@ -62,7 +62,7 @@ fn test_c_jal_positive() {
     // 0b001_0_0_00_0_1_0_010_1_01 = 0b0010000010010101 = 0x2095
     
     let inst = 0x2095;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 + 100);
@@ -165,7 +165,7 @@ fn test_c_jal_negative() {
     // 0b001 1 1 11 1 0 1 110 0 01 = 0b0011_1111_0111_0001 = 0x3f71
     
     let inst = 0x3f71;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 - 100);
@@ -202,7 +202,7 @@ fn test_c_jal_max_forward() {
     // 0b001_0_1_11_1_1_1_111_1_01 = 0b0010111111111101 = 0x2ffd
     
     let inst = 0x2ffd;
-    bus.write_inst16(0x1000, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x1000, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1000 + 2046);
@@ -239,7 +239,7 @@ fn test_c_jal_max_backward() {
     // 0b001_1_0_00_0_0_0_000_0_01 = 0b0011000000000001 = 0x3001
     
     let inst = 0x3001;
-    bus.write_inst16(0x1000, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x1000, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x1000 - 2048);
@@ -262,7 +262,7 @@ fn test_c_j_positive() {
     // c.j 100 bits: 101 0 0 00 0 1 0 010 1 01 = 0xa095
     
     let inst = 0xa095;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 + 100);
@@ -282,7 +282,7 @@ fn test_c_j_negative() {
     // c.j -100 bits: 101 1 1 11 1 0 1 110 0 01 = 0xbf71
     
     let inst = 0xbf71;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
 
     cpu.step(&mut bus);
     assert_eq!(cpu.pc, 0x200 - 100);
@@ -389,7 +389,7 @@ fn test_c_beqz_taken() {
     // 0b110_0_01_000_00_01_0_01 = 0xc409
     
     let inst = 0xc409;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 0;
 
     cpu.step(&mut bus);
@@ -403,7 +403,7 @@ fn test_c_beqz_not_taken() {
 
     // c.beqz x8, 10 (0xc409)
     let inst = 0xc409;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 1;
 
     cpu.step(&mut bus);
@@ -438,7 +438,7 @@ fn test_c_beqz_negative() {
     // 0b110_1_10_000_11_11_1_01 = 0xd87d
     
     let inst = 0xd87d;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 0;
 
     cpu.step(&mut bus);
@@ -456,7 +456,7 @@ fn test_c_bnez_taken() {
     // 0b111_0_01_000_00_01_0_01 = 0xe409
 
     let inst = 0xe409;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 1;
 
     cpu.step(&mut bus);
@@ -470,7 +470,7 @@ fn test_c_bnez_not_taken() {
 
     // c.bnez x8, 10 (0xe409)
     let inst = 0xe409;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 0;
 
     cpu.step(&mut bus);
@@ -488,7 +488,7 @@ fn test_c_bnez_negative() {
     // 0b111_1_10_000_11_11_1_01 = 0xf87d
 
     let inst = 0xf87d;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[8] = 1;
 
     cpu.step(&mut bus);
@@ -510,7 +510,7 @@ fn test_c_jr() {
     // 0b1000_00001_00000_10 = 0x8082
 
     let inst = 0x8082;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[1] = 0x400;
 
     cpu.step(&mut bus);
@@ -521,7 +521,7 @@ fn test_c_jr() {
     // 0b1000_00101_00000_10 = 0x8282
     let mut cpu = Cpu::new(0x300);
     let inst = 0x8282;
-    bus.write_inst16(0x300, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x300, inst);
     cpu.regs[5] = 0x601; // address should be aligned to 2 bytes, but C.JR clears the last bit?
     // Spec says: "C.JR ... PC = x[rs1] & ~1"
 
@@ -544,7 +544,7 @@ fn test_c_jalr() {
     // 0b1001_00101_00000_10 = 0x9282
 
     let inst = 0x9282;
-    bus.write_inst16(0x200, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x200, inst);
     cpu.regs[5] = 0x400;
 
     cpu.step(&mut bus);
@@ -554,7 +554,7 @@ fn test_c_jalr() {
     // c.jalr x6, misaligned
     let mut cpu = Cpu::new(0x300);
     let inst = 0x9302; // rs1 = 6
-    bus.write_inst16(0x300, inst);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst16(0x300, inst);
     cpu.regs[6] = 0x501;
 
     cpu.step(&mut bus);

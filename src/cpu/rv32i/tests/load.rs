@@ -13,7 +13,7 @@ fn test_lb() {
     // inst = (4 << 20) | (2 << 15) | (0 << 12) | (1 << 7) | 0x03
     //      = 0x00410083
     let inst_bin = 0x00410083;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 1. 正の値をロード
     cpu.regs[2] = 0x1000;
@@ -32,7 +32,7 @@ fn test_lb() {
     // 3. x0 レジスタへのロード (無視される)
     // LB x0, 4(x2) (rd=0, rs1=2, funct3=0, imm=4, opcode=0000011)
     let inst_bin = 0x00410003;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.pc = 0x1000;
     bus.write8(0x1004, 0x55);
     cpu.step(&mut bus);
@@ -49,7 +49,7 @@ fn test_lh() {
     // inst = (4 << 20) | (2 << 15) | (1 << 12) | (1 << 7) | 0x03
     //      = 0x00411083
     let inst_bin = 0x00411083;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 1. 正の値をロード
     cpu.regs[2] = 0x1000;
@@ -68,7 +68,7 @@ fn test_lh() {
     // 3. x0 レジスタへのロード (無視される)
     // LH x0, 4(x2) (rd=0, rs1=2, funct3=1, imm=4, opcode=0000011)
     let inst_bin = 0x00411003;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.pc = 0x1000;
     bus.write16(0x1004, 0x1234);
     cpu.step(&mut bus);
@@ -85,7 +85,7 @@ fn test_lw() {
     // inst = (4 << 20) | (2 << 15) | (2 << 12) | (1 << 7) | 0x03
     //      = 0x00412083
     let inst_bin = 0x00412083;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 1. 通常のロード
     cpu.regs[2] = 0x1000;
@@ -104,7 +104,7 @@ fn test_lw() {
     // 3. x0 レジスタへのロード (無視される)
     // LW x0, 4(x2) (rd=0, rs1=2, funct3=2, imm=4, opcode=0000011)
     let inst_bin = 0x00412003;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.pc = 0x1000;
     bus.write32(0x1004, 0xDEADBEEF);
     cpu.step(&mut bus);
@@ -121,7 +121,7 @@ fn test_lbu() {
     // inst = (4 << 20) | (2 << 15) | (4 << 12) | (1 << 7) | 0x03
     //      = 0x00414083
     let inst_bin = 0x00414083;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 1. 正の値をロード
     cpu.regs[2] = 0x1000;
@@ -140,7 +140,7 @@ fn test_lbu() {
     // 3. x0 レジスタへのロード (無視される)
     // LBU x0, 4(x2) (rd=0, rs1=2, funct3=4, imm=4, opcode=0000011)
     let inst_bin = 0x00414003;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.pc = 0x1000;
     bus.write8(0x1004, 0x55);
     cpu.step(&mut bus);
@@ -157,7 +157,7 @@ fn test_lhu() {
     // inst = (4 << 20) | (2 << 15) | (5 << 12) | (1 << 7) | 0x03
     //      = 0x00415083
     let inst_bin = 0x00415083;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
 
     // 1. 正の値をロード
     cpu.regs[2] = 0x1000;
@@ -176,7 +176,7 @@ fn test_lhu() {
     // 3. x0 レジスタへのロード (無視される)
     // LHU x0, 4(x2) (rd=0, rs1=2, funct3=5, imm=4, opcode=0000011)
     let inst_bin = 0x00415003;
-    bus.write_inst32(0x1000, inst_bin);
+    cpu.flush_cache_line(cpu.pc); bus.write_inst32(0x1000, inst_bin);
     cpu.pc = 0x1000;
     bus.write16(0x1004, 0xAAAA);
     cpu.step(&mut bus);
