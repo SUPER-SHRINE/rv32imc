@@ -49,6 +49,9 @@ pub struct Cpu {
     /// 命令キャッシュ
     pages: Vec<Option<InstructionCachePage>>,
 
+    /// 現在参照しているページ
+    current_page: InstructionCachePage,
+
     /// 命令キャッシュのページ番号
     current_page_num: u32,
 }
@@ -61,6 +64,7 @@ impl Cpu {
             csr: Csr::default(),
             mode: PrivilegeMode::Machine,
             pages: vec![None; 1024],
+            current_page: [Instruction::None; ENTRY_COUNT],
             current_page_num: 0xffffffff, // 最初は必ずキャッシュミスするように
         }
     }
@@ -101,11 +105,11 @@ impl Cpu {
         while self.pc <= max_page_num {
             let page_offset = (self.pc & (PAGE_SIZE as u32 - 1)) as usize;
             let entry_idx = page_offset >> 1;
-            let mut inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
+            let mut inst = self.current_page[entry_idx];
 
             if matches!(inst, Instruction::None) {
                 self.gen_cache_page(bus);
-                inst = self.pages[page_num].as_ref().unwrap()[entry_idx];
+                inst = self.current_page[entry_idx];
             }
 
             result = self.exec(inst, bus);
@@ -251,6 +255,7 @@ impl Cpu {
             raw_ptr += inst_size;
             if (raw_ptr & (page_size - 1)) == 0 { break; }
         }
+        self.current_page = cache;
         self.pages[(start_pc / page_size) as usize] = Some(cache);
     }
 
