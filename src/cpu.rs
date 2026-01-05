@@ -98,10 +98,11 @@ impl Cpu {
                 self.gen_cache_page(bus);
             } else {
                 self.current_page_num = page_num as u32;
+                self.current_page = self.pages[page_num].unwrap();
             }
         }
 
-        let max_page_num = (self.pc | 0xfff) as u32;
+        let max_page_num = self.pc | 0xfff;
         while self.pc <= max_page_num {
             let page_offset = (self.pc & (PAGE_SIZE as u32 - 1)) as usize;
             let entry_idx = page_offset >> 1;
