@@ -58,11 +58,17 @@ impl Cpu {
         // 1. mepc に現在の PC を保存
         self.csr.mepc = self.pc;
 
-        // 2. mcause, mtval の更新
+        // 2. mcause に例外コードを設定
         self.csr.mcause = exception_code;
+
+        // 3. mtval の設定
         self.csr.mtval = mtval;
 
         // 3. mstatus の更新 (MPP, MPIE, MIE)
+        // mstatus bit fields:
+        // MIE:  bit 3
+        // MPIE: bit 7
+        // MPP:  bits 11-12
         let mie = (self.csr.mstatus >> 3) & 1;
         self.csr.mstatus &= !(1 << 7); // MPIE = 0
         self.csr.mstatus |= mie << 7;  // MPIE = MIE
@@ -75,7 +81,7 @@ impl Cpu {
         // 4. 特権モードを Machine に遷移
         self.mode = PrivilegeMode::Machine;
 
-        // 5. mtvec の設定に従ってジャンプ
+        // 5. mtvec のアドレスへジャンプ
         let is_interrupt = (exception_code >> 31) & 1;
         let mtvec_mode = self.csr.mtvec & 0b11;
         let mtvec_base = self.csr.mtvec & !0b11;
